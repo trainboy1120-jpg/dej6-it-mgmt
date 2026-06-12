@@ -115,6 +115,45 @@ body { background:#f0f4f8; font-size:.9rem; }
     </div>
   </div>
 
+  <!-- クイックリンク集 -->
+  <div class="card mb-2 shadow-sm" id="quickLinksCard">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="fw-bold small text-muted me-1"><i class="bi bi-link-45deg me-1"></i>修理フロー リンク集</span>
+        <!-- SSP / TC57 -->
+        <span class="badge bg-warning text-dark fw-normal small">SSP / TC57</span>
+        <a href="https://t.corp.amazon.com/create/templates/c0bfd429-2e74-4998-ad75-c1d06b6e4092"
+           target="_blank" class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:.75rem">
+          <i class="bi bi-ticket-perforated me-1"></i>SIM起票テンプレート
+        </a>
+        <div class="vr mx-1"></div>
+        <!-- Zebra 共通 -->
+        <span class="badge bg-primary fw-normal small">SSP / FS 共通</span>
+        <a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login"
+           target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem">
+          <i class="bi bi-tools me-1"></i>Zebra 修理ポータル
+        </a>
+        <span class="text-muted small font-monospace" title="Zebraポータル ログインアカウント">
+          <i class="bi bi-person-circle me-1 text-muted"></i>dej6-amzl-rma@amazon.com
+        </span>
+        <div class="vr mx-1 d-none d-lg-block"></div>
+        <!-- ヤマト -->
+        <span class="badge bg-secondary fw-normal small d-none d-lg-inline">発送</span>
+        <a href="https://jizen.kuronekoyamato.co.jp/jizen/servlet/jp.co.kuronekoyamato.www.jizen.servlet.login.JizenLoginInitServlet"
+           target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2 d-none d-lg-inline-block" style="font-size:.75rem">
+          <i class="bi bi-box-seam me-1"></i>ヤマト送り状発行
+        </a>
+        <div class="ms-auto">
+          <button class="btn btn-sm btn-link text-muted p-0" style="font-size:.72rem"
+            onclick="document.getElementById('quickLinksCard').style.display='none'"
+            title="リンク集を非表示">
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- テーブル -->
   <div class="card p-0 shadow-sm">
     <div class="table-container">
