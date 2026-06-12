@@ -961,7 +961,12 @@ function buildForm(status) {
     </div>`
 
   } else if (status === 'SIM起票済み') {
-    const isFS = d.device_type === 'FS'
+    const isFS  = d.device_type === 'FS'
+    const isZD  = d.device_type === 'ZD611'
+    const simLink = isZD
+      ? 'https://t.corp.amazon.com/create/templates/e75944fb-e00d-4557-9b91-795d48c49129'
+      : 'https://t.corp.amazon.com/create/templates/c0bfd429-2e74-4998-ad75-c1d06b6e4092'
+    const simLabel = isZD ? 'ZD611 SIMテンプレートを開く →' : 'SSP/TC57 SIMテンプレートを開く →'
     html = isFS
       ? `<div class="alert alert-warning py-2 small">
           <i class="bi bi-exclamation-triangle me-1"></i>
@@ -977,9 +982,7 @@ function buildForm(status) {
       : `<div class="alert alert-info py-2 small">
           <i class="bi bi-info-circle me-1"></i>
           SIMを起票後、起票したチケットのURLを入力してください。<br>
-          <a href="https://t.corp.amazon.com/create/templates/c0bfd429-2e74-4998-ad75-c1d06b6e4092" target="_blank">
-            SSP/TC57 SIMテンプレートを開く →
-          </a>
+          <a href="${simLink}" target="_blank">${simLabel}</a>
         </div>
         <div class="row g-2">
           <div class="col-12">
