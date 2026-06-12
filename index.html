@@ -43,6 +43,7 @@ body { background:#f0f4f8; font-size:.9rem; }
     <div class="d-flex align-items-center gap-2">
       <small class="text-secondary d-none d-md-inline">Quip管理表の後継システム</small>
       <span id="dbStatus" class="badge bg-secondary">未接続</span>
+      <button class="btn btn-sm btn-outline-info" onclick="openSOP()"><i class="bi bi-question-circle me-1"></i>使い方</button>
       <button class="btn btn-sm btn-outline-light" onclick="openConfig()"><i class="bi bi-gear"></i> 設定</button>
     </div>
   </div>
@@ -137,6 +138,269 @@ body { background:#f0f4f8; font-size:.9rem; }
           </td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- 使い方（SOP）モーダル -->
+<div class="modal fade" id="sopModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1e293b">
+        <h5 class="modal-title fw-bold text-white"><i class="bi bi-book me-2 text-info"></i>DEJ6 IT機器管理システム — 使い方（SOP）</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+
+        <!-- 概要 -->
+        <div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+          <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+          <div>
+            <strong>このシステムについて</strong><br>
+            Quip管理表の後継システムです。DEJ6のIT機器（SSP / FS / ZD611 / Avery / Handy / 無線機 / PC / 携帯）479台のステータスをリアルタイムで管理します。<br>
+            URLはブックマーク推奨：<code>https://trainboy1120-jpg.github.io/dej6-it-mgmt/</code>
+          </div>
+        </div>
+
+        <!-- STEP 0: 初回セットアップ -->
+        <div class="card mb-4 border-warning">
+          <div class="card-header fw-bold" style="background:#fff3cd">
+            <i class="bi bi-gear me-2"></i>STEP 0 — 初回セットアップ（初回のみ）
+          </div>
+          <div class="card-body">
+            <ol class="mb-0">
+              <li class="mb-2">右上の <span class="badge bg-secondary"><i class="bi bi-gear"></i> 設定</span> ボタンをクリック</li>
+              <li class="mb-2">以下を入力して「保存して接続」：
+                <table class="table table-sm table-bordered mt-2 mb-0">
+                  <tbody>
+                    <tr><th class="bg-light" style="width:140px">Supabase URL</th><td><code>https://tetigwcotdqgkwfswbyc.supabase.co</code></td></tr>
+                    <tr><th class="bg-light">API Key</th><td>※ IT POCメンバーに確認してください（anon public key）</td></tr>
+                    <tr><th class="bg-light">担当者エイリアス</th><td>自分のAmazonエイリアスを入力（例: <code>sakrhiro</code>）</td></tr>
+                  </tbody>
+                </table>
+              </li>
+              <li>右上のバッジが <span class="badge bg-success">接続済み</span> になれば完了</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- STEP 1: 画面の見方 -->
+        <div class="card mb-4 border-primary">
+          <div class="card-header fw-bold text-white" style="background:#0d6efd">
+            <i class="bi bi-layout-text-window me-2"></i>STEP 1 — 画面の見方
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <h6 class="fw-bold">① サマリーカード（上部）</h6>
+                <table class="table table-sm table-bordered">
+                  <tbody>
+                    <tr><td>総台数</td><td>全機器数</td></tr>
+                    <tr><td class="text-warning fw-bold">修理中</td><td>現在修理対応中の台数</td></tr>
+                    <tr><td style="color:#fd7e14" class="fw-bold">SIM起票済み</td><td>SIM（社内チケット）を起票した台数</td></tr>
+                    <tr><td class="text-primary fw-bold">Zebra登録済み</td><td>Zebraポータルに修理登録した台数</td></tr>
+                    <tr><td style="color:#6f42c1" class="fw-bold">発送済み</td><td>Zebraへ発送済みの台数</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="col-md-6">
+                <h6 class="fw-bold">② フィルター・検索</h6>
+                <ul class="mb-0">
+                  <li><strong>種別チップ</strong>（SSP / FS / ZD611...）: 機器の種類で絞り込み</li>
+                  <li><strong>ステータスチップ</strong>（全ステータス / 正常 / 修理中...）: 状態で絞り込み</li>
+                  <li><strong>検索ボックス</strong>: 機器ID・シリアル番号・アセット番号・MEMOでキーワード検索</li>
+                </ul>
+                <div class="alert alert-light border mt-2 mb-0 py-2 small">
+                  💡 「修理中」フィルターを押すと現在対応が必要な機器だけ一覧表示できます
+                </div>
+              </div>
+              <div class="col-12">
+                <h6 class="fw-bold">③ テーブルの列</h6>
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered">
+                    <thead class="table-dark"><tr><th>列名</th><th>内容</th></tr></thead>
+                    <tbody>
+                      <tr><td><strong>機器ID</strong></td><td>システム内の識別ID（例: SSP-001, FS-13）。クリックでステータス更新モーダルを開く</td></tr>
+                      <tr><td><strong>種別</strong></td><td>SSP / FS / ZD611 / Avery / Handy / 無線機 / PC / 携帯</td></tr>
+                      <tr><td><strong>アセット</strong></td><td>資産管理番号（AMZL番号）</td></tr>
+                      <tr><td><strong>シリアル番号</strong></td><td>機器固有のシリアルナンバー</td></tr>
+                      <tr><td><strong>ステータス</strong></td><td>現在の状態（下記フロー参照）</td></tr>
+                      <tr><td><strong>担当者</strong></td><td>対応した担当者のエイリアス</td></tr>
+                      <tr><td><strong>Zebra RMA</strong></td><td>Zebra修理受付番号</td></tr>
+                      <tr><td><strong>MEMO</strong></td><td>不具合詳細・SIM URLなど（30文字で省略表示）</td></tr>
+                      <tr><td><i class="bi bi-clock-history"></i></td><td>その機器の修理履歴を表示</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: 修理フロー -->
+        <div class="card mb-4 border-danger">
+          <div class="card-header fw-bold text-white bg-danger">
+            <i class="bi bi-arrow-right-circle me-2"></i>STEP 2 — 修理フロー（ステータスの流れ）
+          </div>
+          <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-1 mb-3 fs-6">
+              <span class="status-badge status-正常">正常</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="status-badge status-修理中">修理中</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="status-badge status-SIM起票済み">SIM起票済み</span>
+              <span class="text-muted small">（SSPのみ）</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="status-badge status-Zebra登録済み">Zebra登録済み</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="status-badge status-発送済み">発送済み</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="status-badge status-修理完了">修理完了</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="status-badge status-正常">正常</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm">
+                <thead class="table-dark"><tr><th>ステータス</th><th>やること</th><th>入力項目</th><th>注意点</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><span class="status-badge status-修理中">修理中</span></td>
+                    <td>機器の不具合を発見した時、最初に設定</td>
+                    <td>不具合カテゴリー・不具合詳細・担当者</td>
+                    <td>—</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge status-SIM起票済み">SIM起票済み</span></td>
+                    <td>社内SIM（t.corp）にチケットを起票したら設定</td>
+                    <td>SIM URL（必須）・担当者</td>
+                    <td><strong>FSはこのステップをスキップ</strong>してZebra登録済みへ</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge status-Zebra登録済み">Zebra登録済み</span></td>
+                    <td><a href="https://repair.zebra.com" target="_blank">Zebraポータル</a>に修理登録したら設定</td>
+                    <td>RMA番号（必須）・担当者</td>
+                    <td>備考欄に<strong>「スワップ禁止」</strong>と記入すること（必須）</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge status-発送済み">発送済み</span></td>
+                    <td>ヤマトで発送したら設定</td>
+                    <td>発送日（必須）・伝票番号・RMA番号・担当者</td>
+                    <td>Slackプレビューが自動生成 → #dej6-it-poc にコピー送信</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge status-修理完了">修理完了</span></td>
+                    <td>Zebraから機器が返却されたら設定</td>
+                    <td>返却日・担当者</td>
+                    <td>Slackプレビューが自動生成 → #dej6-it-poc にコピー送信</td>
+                  </tr>
+                  <tr>
+                    <td><span class="status-badge status-正常">正常に戻す</span></td>
+                    <td>修理完了後・再稼働時に設定</td>
+                    <td>なし</td>
+                    <td>RMA・シリアル等の修理関連データはクリアされる</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: ステータス更新の操作手順 -->
+        <div class="card mb-4 border-success">
+          <div class="card-header fw-bold text-white bg-success">
+            <i class="bi bi-pencil-square me-2"></i>STEP 3 — ステータス更新の操作手順
+          </div>
+          <div class="card-body">
+            <ol>
+              <li class="mb-2">テーブルで対象の機器行を<strong>クリック</strong>（どこをクリックしてもOK）</li>
+              <li class="mb-2">「ステータス更新」モーダルが開く → 現在の機器情報を確認</li>
+              <li class="mb-2">新しいステータスボタンを選択（例: <kbd>修理中</kbd>）</li>
+              <li class="mb-2">表示されたフォームに必要事項を入力</li>
+              <li class="mb-2">「発送済み」「修理完了」の場合：Slackプレビューを確認 → <kbd>コピーして #dej6-it-poc に貼り付け</kbd> ボタンでコピー → Slackに貼り付けて送信</li>
+              <li><strong class="text-success">保存する</strong> ボタンをクリック → テーブルが自動更新される</li>
+            </ol>
+            <div class="alert alert-warning py-2 mb-0 small">
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              <strong>保存前にモーダルを閉じると変更は破棄されます。</strong>必ず「保存する」まで操作してください。
+            </div>
+          </div>
+        </div>
+
+        <!-- FAQ -->
+        <div class="card mb-0 border-secondary">
+          <div class="card-header fw-bold bg-light">
+            <i class="bi bi-patch-question me-2"></i>よくある質問（FAQ）
+          </div>
+          <div class="card-body">
+            <div class="accordion accordion-flush" id="faqAccordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                    「未接続」のままでデータが見えない
+                  </button>
+                </h2>
+                <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    初回は設定が必要です。右上「設定」ボタン → Supabase URL と API Key を入力 → 「保存して接続」。API KeyはIT POCメンバーに確認してください。
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                    FSの修理フローはSSPと何が違う？
+                  </button>
+                </h2>
+                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    FSはSIM（社内チケット）の起票が不要です。修理中 → <strong>Zebra登録済み → 発送済み → 修理完了 → 正常</strong> の流れで進めてください。SIM起票済みを選ぶと警告メッセージが表示されます。
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                    Zebraポータルの「スワップ禁止」とは？
+                  </button>
+                </h2>
+                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    Zebraの修理では機器交換（スワップ）が行われることがあります。Amazonの資産管理上、同一シリアル番号の機器が戻ってこないと管理が崩れるため、<strong>必ず備考欄に「スワップ禁止」と記入</strong>してください。
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                    修理履歴はどこで確認できる？
+                  </button>
+                </h2>
+                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    各行の右端にある <i class="bi bi-clock-history"></i> ボタンをクリックすると、その機器の全ステータス変更履歴が時系列で確認できます。
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                    設定（URLとAPIキー）はどこに保存されている？
+                  </button>
+                </h2>
+                <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    ブラウザのlocalStorageに保存されています。同じPC・同じブラウザなら再入力不要です。別のPC・別のブラウザでは初回設定が必要です。シークレットモードでは保存されません。
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+      </div>
     </div>
   </div>
 </div>
@@ -771,6 +1035,11 @@ function toast(msg, type='success') {
   el.className = `toast align-items-center text-white border-0 bg-${type}`
   document.getElementById('toastMsg').textContent = msg
   bootstrap.Toast.getOrCreateInstance(el, {delay:4000}).show()
+}
+
+// ─── SOP ─────────────────────────────────────────
+window.openSOP = () => {
+  new bootstrap.Modal(document.getElementById('sopModal')).show()
 }
 
 // ─── 起動 ────────────────────────────────────────
