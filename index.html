@@ -33,6 +33,9 @@ body { background:#f0f4f8; font-size:.9rem; }
 .slack-preview { background:#1a1d2e; color:#d4d4d8; border-radius:8px; padding:1rem; font-family:monospace; white-space:pre-wrap; font-size:.84rem; border-left:4px solid #4a154b; }
 .history-item { border-left:3px solid #e2e8f0; padding:.4rem .75rem; margin-bottom:.5rem; }
 .table-hover tbody tr:hover { background:#eff6ff !important; cursor:pointer; }
+.fb-available { background:#d1f2eb; color:#0b5e3f; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
+.fb-rented    { background:#fff3cd; color:#7a5700; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
+.fb-broken    { background:#f8d7da; color:#842029; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
 .navbar-brand { font-size:1rem; }
 </style>
 </head>
@@ -137,6 +140,12 @@ body { background:#f0f4f8; font-size:.9rem; }
           <i class="bi bi-person-circle me-1 text-muted"></i>dej6-amzl-rma@amazon.com
         </span>
 
+        <div class="vr mx-1"></div>
+        <span class="badge bg-info text-dark fw-normal small">SSP</span>
+        <a href="https://qr-app-iota.vercel.app/" target="_blank"
+           class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:.75rem">
+          <i class="bi bi-tablet me-1"></i>SSP管理ツール
+        </a>
         <div class="ms-auto">
           <button class="btn btn-sm btn-link text-muted p-0" style="font-size:.72rem"
             onclick="document.getElementById('quickLinksCard').style.display='none'"
@@ -604,6 +613,32 @@ window.saveConfig = async () => {
   await initSB()
 }
 
+// ─── Firebase（SSP稼働状況）────────────────────────
+const FB_URL = 'https://ssp-rental-default-rtdb.asia-southeast1.firebasedatabase.app'
+let fbItems = {}
+
+async function loadFirebase() {
+  try {
+    const res = await fetch(`${FB_URL}/qr_items.json`)
+    if (res.ok) {
+      fbItems = (await res.json()) || {}
+    }
+  } catch(e) {
+    console.warn('Firebase読み込み失敗:', e)
+  }
+}
+
+function fbBadge(deviceId) {
+  if (!deviceId || !deviceId.startsWith('SSP-')) return ''
+  const key = deviceId.replace('SSP-', '').padStart(3, '0')
+  const fb = fbItems[key]
+  if (!fb) return ''
+  if (fb.status === 'rented')    return `<span class="fb-rented ms-1" title="${fb.userName ? '担当: '+fb.userName : ''}">使用中</span>`
+  if (fb.status === 'broken')    return `<span class="fb-broken ms-1">故障登録</span>`
+  if (fb.status === 'available') return `<span class="fb-available ms-1">空き</span>`
+  return ''
+}
+
 // ─── Supabase REST ヘルパー ────────────────────────
 function sbHeaders() {
   const c = cfg()
@@ -648,9 +683,11 @@ async function initSB() {
   setDbStatus('接続中...', 'warning')
   if (!c.url || !c.key) { setDbStatus('未接続', 'secondary'); return }
   try {
-    await loadDevices()
+    // Supabase と Firebase を並列取得
+    await Promise.all([loadDevices(), loadFirebase()])
     setDbStatus('接続済み', 'success')
     document.getElementById('slackAutoArea').style.display = c.slack ? 'inline' : 'none'
+    renderTable() // Firebase データ反映のため再描画
   } catch(e) {
     setDbStatus('エラー', 'danger')
     toast('接続エラー: ' + e.message, 'danger')
@@ -717,7 +754,7 @@ function renderTable() {
       <td class="small">${d.model||''}</td>
       <td class="font-monospace small text-muted">${d.asset_number||''}</td>
       <td class="font-monospace small">${d.serial_number||''}</td>
-      <td><span class="status-badge status-${d.status}">${d.status}</span></td>
+      <td><span class="status-badge status-${d.status}">${d.status}</span>${fbBadge(d.device_id)}</td>
       <td class="small">${d.ops_handler||d.it_handler||''}</td>
       <td class="font-monospace small text-info">${d.zebra_rma||''}</td>
       <td class="small text-muted">${trunc(d.memo||d.sim_url||'',30)}</td>
