@@ -368,6 +368,50 @@ body { background:#f0f4f8; font-size:.9rem; }
           </div>
         </div>
 
+        <!-- 更新履歴 -->
+        <div class="card mb-4 border-info">
+          <div class="card-header fw-bold" style="background:#cff4fc">
+            <i class="bi bi-clock-history me-2"></i>更新履歴（主な変更点）
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-sm table-bordered mb-0">
+              <thead class="table-dark">
+                <tr><th style="width:120px">日付</th><th>変更内容</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-nowrap">2026-06-13</td>
+                  <td>
+                    <strong>SSP管理ツール（Firebase）とリアルタイム連携を追加</strong><br>
+                    <span class="text-muted small">SSP行のステータス列に稼働状況バッジ（空き / 使用中 / 故障登録）を表示。Yamashita-san作のSSP管理ツール（Firebase）から自動取得。</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-nowrap">2026-06-13</td>
+                  <td>
+                    <strong>修理フロー リンク集を追加</strong><br>
+                    <span class="text-muted small">テーブル上部に常時表示のリンク集（SIM起票テンプレート / Zebraポータル / SSP管理ツール）を追加。</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-nowrap">2026-06-13</td>
+                  <td>
+                    <strong>使い方（SOP）モーダルを追加</strong><br>
+                    <span class="text-muted small">ナビバーの「使い方」ボタンからアクセス可能。操作手順・修理フロー・FAQを内蔵。</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-nowrap">2026-06-13</td>
+                  <td>
+                    <strong>システム初公開（Quip管理表の後継）</strong><br>
+                    <span class="text-muted small">479台（SSP/FS/ZD611/Avery/Handy/無線機/PC/携帯）のステータス管理・修理フロー・履歴記録・Slack通知機能を実装。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- FAQ -->
         <div class="card mb-0 border-secondary">
           <div class="card-header fw-bold bg-light">
@@ -432,6 +476,81 @@ body { background:#f0f4f8; font-size:.9rem; }
                 <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                   <div class="accordion-body py-2 small">
                     ブラウザのlocalStorageに保存されています。同じPC・同じブラウザなら再入力不要です。別のPC・別のブラウザでは初回設定が必要です。シークレットモードでは保存されません。
+                  </div>
+                </div>
+              </div>
+            </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+                    SSPの行に表示される「空き」「使用中」「故障登録」のバッジは何？
+                  </button>
+                </h2>
+                <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    Yamashita-sanが作成したSSP管理ツール（<a href="https://qr-app-iota.vercel.app/" target="_blank">qr-app-iota.vercel.app</a>）の稼働状況をリアルタイムで取得して表示しています。<br>
+                    <ul class="mb-0 mt-1">
+                      <li><span class="fb-available">空き</span>：誰も使用していない状態</li>
+                      <li><span class="fb-rented">使用中</span>：QRスキャンで貸出中。バッジにカーソルを当てると担当者名が表示されます</li>
+                      <li><span class="fb-broken">故障登録</span>：SSP管理ツール上で故障登録された状態</li>
+                    </ul>
+                    ページを再読み込みすると最新状態に更新されます。
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq7">
+                    SSPの稼働状況バッジが表示されない
+                  </button>
+                </h2>
+                <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    以下を確認してください：
+                    <ul class="mb-0">
+                      <li>Supabaseに接続済み（右上バッジが「接続済み」）かどうか</li>
+                      <li>ページを一度再読み込みする</li>
+                      <li>FS・ZD611など SSP以外の機器にはバッジは表示されません（SSP専用機能です）</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq8">
+                    「故障登録」バッジと「修理中」ステータスの違いは？
+                  </button>
+                </h2>
+                <div id="faq8" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    <table class="table table-sm table-bordered mb-0">
+                      <thead class="table-dark"><tr><th>表示</th><th>どのツールの情報</th><th>意味</th></tr></thead>
+                      <tbody>
+                        <tr><td><span class="fb-broken">故障登録</span></td><td>SSP管理ツール（Yamashita-san作）</td><td>現場担当者がQRスキャンで故障登録した状態</td></tr>
+                        <tr><td><span class="status-badge status-修理中">修理中</span></td><td>このシステム（IT機器管理）</td><td>IT POCが修理フローを開始した状態</td></tr>
+                      </tbody>
+                    </table>
+                    <div class="alert alert-warning py-1 small mt-2 mb-0">
+                      <i class="bi bi-exclamation-triangle me-1"></i>
+                      「故障登録」が付いているSSPは、このシステムでも「修理中」に更新してください。
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="accordion-item">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq9">
+                    SSP管理ツールとこのシステム、どちらで管理するの？
+                  </button>
+                </h2>
+                <div id="faq9" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body py-2 small">
+                    <strong>役割分担があります。</strong>
+                    <ul class="mb-0 mt-1">
+                      <li><strong>SSP管理ツール</strong>：現場オペレーションの貸出・返却・故障登録（QRスキャンで誰でも操作可能）</li>
+                      <li><strong>このシステム</strong>：IT POC担当者による修理フロー管理（Zebra送付・SIM起票・発送追跡）</li>
+                    </ul>
+                    故障が発生したら、SSP管理ツールで故障登録 → このシステムで修理フローを進める、という2段階の運用です。
                   </div>
                 </div>
               </div>
