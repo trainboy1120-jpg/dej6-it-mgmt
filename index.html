@@ -332,7 +332,21 @@ function setDbStatus(txt, color) {
 async function loadDevices() {
   if (!sb) return
   const { data, error } = await sb.from('devices').select('*').order('device_id')
-  if (error) { toast('読み込みエラー: ' + error.message, 'danger'); return }
+  if (error) {
+    console.error('Supabase error:', error)
+    toast('読み込みエラー: ' + error.message, 'danger')
+    // テーブルにもエラーを表示
+    document.getElementById('deviceBody').innerHTML = `
+      <tr><td colspan="10" class="text-center py-4">
+        <div class="alert alert-danger d-inline-block text-start">
+          <strong>データ読み込みエラー</strong><br>
+          <code>${error.message}</code><br>
+          <small class="text-muted">code: ${error.code || 'N/A'} / hint: ${error.hint || 'N/A'}</small><br><br>
+          <button class="btn btn-sm btn-danger" onclick="initSB()">再試行</button>
+        </div>
+      </td></tr>`
+    return
+  }
   allDevices = data || []
   updateSummary(); renderTable()
 }
