@@ -307,13 +307,50 @@ window.saveConfig = async () => {
   await initSB()
 }
 
-// ─── Supabase ─────────────────────────────────────
+// ─── Supabase REST ヘルパー ────────────────────────
+function sbHeaders() {
+  const c = cfg()
+  return {
+    'apikey':        c.key,
+    'Authorization': 'Bearer ' + c.key,
+    'Content-Type':  'application/json',
+    'Prefer':        'return=representation'
+  }
+}
+
+async function sbGet(path) {
+  const c = cfg()
+  const res = await fetch(c.url + '/rest/v1/' + path, { headers: sbHeaders() })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || data.hint || JSON.stringify(data))
+  return data
+}
+
+async function sbPatch(table, filter, body) {
+  const c = cfg()
+  const res = await fetch(`${c.url}/rest/v1/${table}?${filter}`, {
+    method: 'PATCH', headers: sbHeaders(), body: JSON.stringify(body)
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || data.hint || JSON.stringify(data))
+  return data
+}
+
+async function sbPost(table, body) {
+  const c = cfg()
+  const res = await fetch(`${c.url}/rest/v1/${table}`, {
+    method: 'POST', headers: sbHeaders(), body: JSON.stringify(body)
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || data.hint || JSON.stringify(data))
+  return data
+}
+
 async function initSB() {
   const c = cfg()
   setDbStatus('接続中...', 'warning')
   if (!c.url || !c.key) { setDbStatus('未接続', 'secondary'); return }
   try {
-    sb = createClient(c.url, c.key)
     await loadDevices()
     setDbStatus('接続済み', 'success')
     document.getElementById('slackAutoArea').style.display = c.slack ? 'inline' : 'none'
@@ -330,25 +367,24 @@ function setDbStatus(txt, color) {
 }
 
 async function loadDevices() {
-  if (!sb) return
-  const { data, error } = await sb.from('devices').select('*').order('device_id')
-  if (error) {
-    console.error('Supabase error:', error)
-    toast('読み込みエラー: ' + error.message, 'danger')
-    // テーブルにもエラーを表示
+  const c = cfg()
+  if (!c.url || !c.key) return
+  try {
+    const data = await sbGet('devices?select=*&order=device_id')
+    allDevices = Array.isArray(data) ? data : []
+    updateSummary(); renderTable()
+  } catch(e) {
+    console.error('loadDevices error:', e)
     document.getElementById('deviceBody').innerHTML = `
       <tr><td colspan="10" class="text-center py-4">
         <div class="alert alert-danger d-inline-block text-start">
           <strong>データ読み込みエラー</strong><br>
-          <code>${error.message}</code><br>
-          <small class="text-muted">code: ${error.code || 'N/A'} / hint: ${error.hint || 'N/A'}</small><br><br>
+          <code>${e.message}</code><br><br>
           <button class="btn btn-sm btn-danger" onclick="initSB()">再試行</button>
         </div>
       </td></tr>`
-    return
+    throw e
   }
-  allDevices = data || []
-  updateSummary(); renderTable()
 }
 
 function updateSummary() {
@@ -640,7 +676,9 @@ window.sendSlack = async () => {
 
 // ─── 保存 ────────────────────────────────────────
 window.saveStatus = async () => {
-  if (!sb || !currentDevice || !selectedStatus) return
+  if (!currentDevice || !selectedStatus) return
+  const c = cfg()
+  if (!c.url || !c.key) { toast('Supabase未接続です', 'danger'); return }
   const d = currentDevice
   const handler = document.getElementById('fHandler')?.value || ''
   const upd = { status: selectedStatus }
@@ -676,22 +714,23 @@ window.saveStatus = async () => {
       shipping_date:null, tracking_number:null, return_date:null })
   }
 
-  const { error } = await sb.from('devices').update(upd).eq('device_id', d.device_id)
-  if (error) { toast('保存エラー: ' + error.message, 'danger'); return }
-
-  await sb.from('repair_history').insert({
-    device_id:        d.device_id,
-    from_status:      d.status,
-    to_status:        selectedStatus,
-    handler:          handler,
-    note:             document.getElementById('fNote')?.value || upd.defect_detail || '',
-    zebra_rma:        upd.zebra_rma || d.zebra_rma || null,
-    tracking_number:  upd.tracking_number || null,
-  })
-
-  bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide()
-  toast(`${d.device_id} → ${selectedStatus} に更新しました`, 'success')
-  await loadDevices()
+  try {
+    await sbPatch('devices', `device_id=eq.${encodeURIComponent(d.device_id)}`, upd)
+    await sbPost('repair_history', {
+      device_id:        d.device_id,
+      from_status:      d.status,
+      to_status:        selectedStatus,
+      handler:          handler,
+      note:             document.getElementById('fNote')?.value || upd.defect_detail || '',
+      zebra_rma:        upd.zebra_rma || d.zebra_rma || null,
+      tracking_number:  upd.tracking_number || null,
+    })
+    bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide()
+    toast(`${d.device_id} → ${selectedStatus} に更新しました`, 'success')
+    await loadDevices()
+  } catch(e) {
+    toast('保存エラー: ' + e.message, 'danger')
+  }
 }
 
 // ─── 履歴 ────────────────────────────────────────
@@ -699,27 +738,31 @@ window.openHistory = async id => {
   document.getElementById('hDeviceId').textContent = id
   document.getElementById('historyBody').innerHTML = '<div class="text-center py-3 text-muted">読み込み中...</div>'
   new bootstrap.Modal(document.getElementById('historyModal')).show()
-  if (!sb) { document.getElementById('historyBody').innerHTML = '未接続'; return }
-  const { data } = await sb.from('repair_history')
-    .select('*').eq('device_id', id).order('created_at', { ascending: false })
-  if (!data?.length) {
-    document.getElementById('historyBody').innerHTML = '<div class="text-muted py-2">履歴なし</div>'
-    return
+  const c = cfg()
+  if (!c.url || !c.key) { document.getElementById('historyBody').innerHTML = '未接続'; return }
+  try {
+    const data = await sbGet(`repair_history?device_id=eq.${encodeURIComponent(id)}&order=created_at.desc`)
+    if (!data?.length) {
+      document.getElementById('historyBody').innerHTML = '<div class="text-muted py-2">履歴なし</div>'
+      return
+    }
+    document.getElementById('historyBody').innerHTML = data.map(h => `
+      <div class="history-item">
+        <div class="d-flex justify-content-between align-items-start">
+          <span class="status-badge status-${h.to_status}">${h.to_status}</span>
+          <small class="text-muted">${new Date(h.created_at).toLocaleString('ja-JP')}</small>
+        </div>
+        <div class="small mt-1">
+          ${h.from_status ? `<span class="text-muted">${h.from_status} →</span> ` : ''}
+          <strong>${h.to_status}</strong>${h.handler ? ` / ${h.handler}` : ''}
+        </div>
+        ${h.note ? `<div class="small text-secondary mt-1">${h.note}</div>` : ''}
+        ${h.zebra_rma ? `<div class="small text-info">RMA: ${h.zebra_rma}</div>` : ''}
+        ${h.tracking_number ? `<div class="small text-info">伝票: ${h.tracking_number}</div>` : ''}
+      </div>`).join('')
+  } catch(e) {
+    document.getElementById('historyBody').innerHTML = `<div class="text-danger">読み込みエラー: ${e.message}</div>`
   }
-  document.getElementById('historyBody').innerHTML = data.map(h => `
-    <div class="history-item">
-      <div class="d-flex justify-content-between align-items-start">
-        <span class="status-badge status-${h.to_status}">${h.to_status}</span>
-        <small class="text-muted">${new Date(h.created_at).toLocaleString('ja-JP')}</small>
-      </div>
-      <div class="small mt-1">
-        ${h.from_status ? `<span class="text-muted">${h.from_status} →</span> ` : ''}
-        <strong>${h.to_status}</strong>${h.handler ? ` / ${h.handler}` : ''}
-      </div>
-      ${h.note ? `<div class="small text-secondary mt-1">${h.note}</div>` : ''}
-      ${h.zebra_rma ? `<div class="small text-info">RMA: ${h.zebra_rma}</div>` : ''}
-      ${h.tracking_number ? `<div class="small text-info">伝票: ${h.tracking_number}</div>` : ''}
-    </div>`).join('')
 }
 
 // ─── Toast ───────────────────────────────────────
