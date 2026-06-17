@@ -598,6 +598,10 @@ body { background:#f0f4f8; font-size:.9rem; }
               <label class="form-label small text-muted mb-1">アセット番号 <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
               <input type="text" class="form-control form-control-sm font-monospace" id="mAssetInput" oninput="checkDirty()" placeholder="アセット番号">
             </div>
+            <div class="col-12">
+              <label class="form-label small text-muted mb-1">メモ（備考） <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
+              <textarea class="form-control form-control-sm" id="mMemoInput" rows="2" oninput="checkDirty()" placeholder="例: スワップ禁止 / 設置場所 など"></textarea>
+            </div>
           </div>
         </div>
         <div class="mb-3">
@@ -924,6 +928,7 @@ window.openStatus = id => {
   document.getElementById('mModel').textContent = d.model||''
   document.getElementById('mSerialInput').value = d.serial_number||''
   document.getElementById('mAssetInput').value = d.asset_number||''
+  document.getElementById('mMemoInput').value = d.memo||''
   document.getElementById('mCurrentStatus').innerHTML = `<span class="status-badge status-${d.status}">${d.status}</span>`
   document.getElementById('dynamicForm').innerHTML = ''
   document.getElementById('slackPreviewArea').style.display = 'none'
@@ -938,7 +943,8 @@ window.checkDirty = () => {
   if (!d) return
   const serialChanged = document.getElementById('mSerialInput').value.trim() !== (d.serial_number||'')
   const assetChanged  = document.getElementById('mAssetInput').value.trim()  !== (d.asset_number||'')
-  if (selectedStatus || serialChanged || assetChanged) {
+  const memoChanged   = document.getElementById('mMemoInput').value.trim()   !== (d.memo||'')
+  if (selectedStatus || serialChanged || assetChanged || memoChanged) {
     document.getElementById('saveBtn').disabled = false
   }
 }
@@ -1167,10 +1173,12 @@ window.saveStatus = async () => {
   // シリアル/アセットの変更を検出
   const newSerial = document.getElementById('mSerialInput').value.trim()
   const newAsset  = document.getElementById('mAssetInput').value.trim()
+  const newMemo   = document.getElementById('mMemoInput').value.trim()
   const serialChanged = newSerial !== (d.serial_number||'')
   const assetChanged  = newAsset  !== (d.asset_number||'')
+  const memoChanged   = newMemo   !== (d.memo||'')
 
-  if (!selectedStatus && !serialChanged && !assetChanged) {
+  if (!selectedStatus && !serialChanged && !assetChanged && !memoChanged) {
     toast('変更がありません', 'warning'); return
   }
 
@@ -1178,6 +1186,7 @@ window.saveStatus = async () => {
   // シリアル/アセットは常に反映（変更があれば）
   if (serialChanged) upd.serial_number = newSerial
   if (assetChanged)  upd.asset_number  = newAsset
+  if (memoChanged)   upd.memo          = newMemo
 
   // ステータス選択時のみステータス関連を反映
   if (selectedStatus) {
@@ -1234,6 +1243,7 @@ window.saveStatus = async () => {
     if (selectedStatus) editMsg.push(`→ ${selectedStatus}`)
     if (serialChanged)  editMsg.push('シリアル番号')
     if (assetChanged)   editMsg.push('アセット番号')
+    if (memoChanged)    editMsg.push('メモ')
     toast(`${d.device_id} ${editMsg.join(' / ')} を更新しました`, 'success')
     await loadDevices()
   } catch(e) {
