@@ -583,14 +583,21 @@ body { background:#f0f4f8; font-size:.9rem; }
       </div>
       <div class="modal-body">
         <div class="p-2 rounded mb-3" style="background:#f8fafc;border:1px solid #e2e8f0">
-          <div class="d-flex flex-wrap gap-3 mb-1">
+          <div class="d-flex flex-wrap gap-3 mb-2">
             <div><span class="text-muted small">機器ID:</span> <strong id="mDeviceId" class="text-primary fs-6"></strong></div>
             <div><span class="text-muted small">種別:</span> <span id="mType"></span></div>
             <div><span class="text-muted small">モデル:</span> <span id="mModel"></span></div>
-          </div>
-          <div class="d-flex flex-wrap gap-3">
-            <div><span class="text-muted small">シリアル:</span> <code id="mSerial"></code></div>
             <div><span class="text-muted small">現在:</span> <span id="mCurrentStatus"></span></div>
+          </div>
+          <div class="row g-2">
+            <div class="col-sm-6">
+              <label class="form-label small text-muted mb-1">シリアル番号 <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
+              <input type="text" class="form-control form-control-sm font-monospace" id="mSerialInput" oninput="checkDirty()" placeholder="シリアル番号">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small text-muted mb-1">アセット番号 <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
+              <input type="text" class="form-control form-control-sm font-monospace" id="mAssetInput" oninput="checkDirty()" placeholder="アセット番号">
+            </div>
           </div>
         </div>
         <div class="mb-3">
@@ -915,13 +922,25 @@ window.openStatus = id => {
   document.getElementById('mDeviceId').textContent = d.device_id
   document.getElementById('mType').innerHTML = `<span class="type-badge type-${d.device_type}">${d.device_type}</span>`
   document.getElementById('mModel').textContent = d.model||''
-  document.getElementById('mSerial').textContent = d.serial_number||''
+  document.getElementById('mSerialInput').value = d.serial_number||''
+  document.getElementById('mAssetInput').value = d.asset_number||''
   document.getElementById('mCurrentStatus').innerHTML = `<span class="status-badge status-${d.status}">${d.status}</span>`
   document.getElementById('dynamicForm').innerHTML = ''
   document.getElementById('slackPreviewArea').style.display = 'none'
   document.getElementById('selectedStatusBadge').style.display = 'none'
   document.getElementById('saveBtn').disabled = true
   new bootstrap.Modal(document.getElementById('statusModal')).show()
+}
+
+// シリアル/アセットが編集されたら（ステータス未選択でも）保存可能にする
+window.checkDirty = () => {
+  const d = currentDevice
+  if (!d) return
+  const serialChanged = document.getElementById('mSerialInput').value.trim() !== (d.serial_number||'')
+  const assetChanged  = document.getElementById('mAssetInput').value.trim()  !== (d.asset_number||'')
+  if (selectedStatus || serialChanged || assetChanged) {
+    document.getElementById('saveBtn').disabled = false
+  }
 }
 
 window.selectStatus = status => {
@@ -1139,13 +1158,32 @@ window.sendSlack = async () => {
 
 // ─── 保存 ────────────────────────────────────────
 window.saveStatus = async () => {
-  if (!currentDevice || !selectedStatus) return
+  if (!currentDevice) return
   const c = cfg()
   if (!c.url || !c.key) { toast('Supabase未接続です', 'danger'); return }
   const d = currentDevice
   const handler = document.getElementById('fHandler')?.value || ''
-  const upd = { status: selectedStatus }
-  if (handler) upd.ops_handler = handler
+
+  // シリアル/アセットの変更を検出
+  const newSerial = document.getElementById('mSerialInput').value.trim()
+  const newAsset  = document.getElementById('mAssetInput').value.trim()
+  const serialChanged = newSerial !== (d.serial_number||'')
+  const assetChanged  = newAsset  !== (d.asset_number||'')
+
+  if (!selectedStatus && !serialChanged && !assetChanged) {
+    toast('変更がありません', 'warning'); return
+  }
+
+  const upd = {}
+  // シリアル/アセットは常に反映（変更があれば）
+  if (serialChanged) upd.serial_number = newSerial
+  if (assetChanged)  upd.asset_number  = newAsset
+
+  // ステータス選択時のみステータス関連を反映
+  if (selectedStatus) {
+    upd.status = selectedStatus
+    if (handler) upd.ops_handler = handler
+  }
 
   if (selectedStatus === '修理中') {
     const cat    = document.getElementById('fDefCat')?.value    || ''
@@ -1179,17 +1217,24 @@ window.saveStatus = async () => {
 
   try {
     await sbPatch('devices', `device_id=eq.${encodeURIComponent(d.device_id)}`, upd)
-    await sbPost('repair_history', {
-      device_id:        d.device_id,
-      from_status:      d.status,
-      to_status:        selectedStatus,
-      handler:          handler,
-      note:             document.getElementById('fNote')?.value || upd.defect_detail || '',
-      zebra_rma:        upd.zebra_rma || d.zebra_rma || null,
-      tracking_number:  upd.tracking_number || null,
-    })
+    // ステータス変更時のみ履歴を記録
+    if (selectedStatus) {
+      await sbPost('repair_history', {
+        device_id:        d.device_id,
+        from_status:      d.status,
+        to_status:        selectedStatus,
+        handler:          handler,
+        note:             document.getElementById('fNote')?.value || upd.defect_detail || '',
+        zebra_rma:        upd.zebra_rma || d.zebra_rma || null,
+        tracking_number:  upd.tracking_number || null,
+      })
+    }
     bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide()
-    toast(`${d.device_id} → ${selectedStatus} に更新しました`, 'success')
+    const editMsg = []
+    if (selectedStatus) editMsg.push(`→ ${selectedStatus}`)
+    if (serialChanged)  editMsg.push('シリアル番号')
+    if (assetChanged)   editMsg.push('アセット番号')
+    toast(`${d.device_id} ${editMsg.join(' / ')} を更新しました`, 'success')
     await loadDevices()
   } catch(e) {
     toast('保存エラー: ' + e.message, 'danger')
