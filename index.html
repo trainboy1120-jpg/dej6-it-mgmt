@@ -894,7 +894,7 @@ function renderTable() {
       <td><span class="status-badge status-${d.status}">${d.status}</span>${fbBadge(d.device_id)}</td>
       <td class="small">${d.ops_handler||d.it_handler||''}</td>
       <td class="font-monospace small text-info">${d.zebra_rma||''}</td>
-      <td class="small text-muted">${trunc(d.memo||d.sim_url||'',30)}</td>
+      <td class="small text-muted">${trunc(d.memo||'',30)}</td>
       <td>
         <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem" title="履歴"
           onclick="event.stopPropagation();openHistory('${esc(d.device_id)}')">
