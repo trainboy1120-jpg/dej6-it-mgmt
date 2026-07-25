@@ -1,0 +1,21 @@
+name: morning digest (8:00 JST)
+
+on:
+  schedule:
+    - cron: '0 23 * * *'   # 23:00 UTC = 8:00 JST
+  workflow_dispatch:
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run digest
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python3 scripts/digest.py

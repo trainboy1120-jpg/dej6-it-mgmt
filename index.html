@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DEJ6 IT機器管理</title>
+<title>DEJ6 IT機器管理 v2</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
 body { background:#f0f4f8; font-size:.9rem; }
 .status-badge { font-size:.72rem; padding:.28em .65em; border-radius:20px; font-weight:700; white-space:nowrap; display:inline-block; }
 .status-正常        { background:#d1f2eb; color:#0b5e3f; }
-.status-修理中      { background:#fff3cd; color:#7a5700; }
+.status-修理待ち     { background:#f8d7da; color:#842029; }
 .status-SIM起票済み   { background:#ffe8cc; color:#7a3800; }
-.status-Zebra登録済み{ background:#cfe2ff; color:#0842a0; }
+.status-RMA登録済み  { background:#cfe2ff; color:#0842a0; }
 .status-発送済み    { background:#e8d5f5; color:#5a1e8c; }
-.status-修理完了    { background:#d1ecf1; color:#0c5460; }
+.status-返却済み    { background:#d1ecf1; color:#0c5460; }
 .type-badge { font-size:.68rem; padding:.18em .5em; border-radius:4px; font-weight:700; }
 .type-SSP    { background:#ffeaa7; color:#5d4200; }
 .type-FS     { background:#dfe6e9; color:#2d3436; }
@@ -25,64 +25,98 @@ body { background:#f0f4f8; font-size:.9rem; }
 .type-PC     { background:#e3f2fd; color:#0d47a1; }
 .type-Mobile { background:#fce4ec; color:#880e4f; }
 #deviceTable thead th { background:#1e293b; color:#e2e8f0; position:sticky; top:0; z-index:1; font-weight:600; }
-.table-container { max-height:calc(100vh - 270px); overflow-y:auto; border-radius:0 0 8px 8px; }
+.table-container { max-height:calc(100vh - 320px); overflow-y:auto; border-radius:0 0 8px 8px; }
 .filter-chip { display:inline-block; padding:.22rem .7rem; border-radius:20px; border:2px solid #dee2e6; background:#fff; cursor:pointer; font-size:.78rem; font-weight:500; transition:all .12s; user-select:none; }
 .filter-chip.active { border-color:#0d6efd; background:#0d6efd; color:#fff; }
 .filter-chip:hover:not(.active) { border-color:#0d6efd; color:#0d6efd; }
-.stat-card { border-radius:10px; border:none; box-shadow:0 2px 6px rgba(0,0,0,.07); }
+.stat-card { border-radius:10px; border:none; box-shadow:0 2px 6px rgba(0,0,0,.07); cursor:pointer; }
+.stat-card.dim { opacity:.45; }
 .slack-preview { background:#1a1d2e; color:#d4d4d8; border-radius:8px; padding:1rem; font-family:monospace; white-space:pre-wrap; font-size:.84rem; border-left:4px solid #4a154b; }
 .history-item { border-left:3px solid #e2e8f0; padding:.4rem .75rem; margin-bottom:.5rem; }
 .table-hover tbody tr:hover { background:#eff6ff !important; cursor:pointer; }
 .fb-available { background:#d1f2eb; color:#0b5e3f; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
 .fb-rented    { background:#fff3cd; color:#7a5700; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
 .fb-broken    { background:#f8d7da; color:#842029; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
+.days-badge   { font-size:.66rem; padding:.15em .45em; border-radius:8px; font-weight:700; }
+.days-warn { background:#fff3cd; color:#7a5700; }
+.days-bad  { background:#f8d7da; color:#842029; }
 .navbar-brand { font-size:1rem; }
+.task-panel { background:linear-gradient(135deg,#1e293b,#0f3460); border-radius:12px; color:#e2e8f0; }
+.task-item { background:rgba(255,255,255,.08); border-radius:8px; padding:.5rem .8rem; }
+.task-item .btn { font-size:.75rem; padding:.15rem .6rem; }
+#bulkBar { position:fixed; bottom:0; left:0; right:0; background:#1e293b; color:#fff; z-index:1040;
+  padding:.6rem 1rem; box-shadow:0 -4px 12px rgba(0,0,0,.3); display:none; }
+#bulkBar .btn { font-size:.8rem; }
+.select-cb { width:1.1rem; height:1.1rem; cursor:pointer; }
+.readonly-note { font-size:.75rem; }
+@media (max-width: 767px) {
+  .table-container { max-height:none; }
+  #deviceTable { font-size:.8rem; }
+  .hide-sm { display:none; }
+}
 </style>
 </head>
 <body>
 <nav class="navbar navbar-dark py-2" style="background:#1e293b">
   <div class="container-fluid">
-    <span class="navbar-brand fw-bold"><i class="bi bi-hdd-rack me-2 text-info"></i>DEJ6 IT機器管理</span>
-    <div class="d-flex align-items-center gap-2">
-      <small class="text-secondary d-none d-md-inline">Quip管理表の後継システム</small>
-      <span id="dbStatus" class="badge bg-secondary">未接続</span>
+    <span class="navbar-brand fw-bold"><i class="bi bi-hdd-rack me-2 text-info"></i>DEJ6 IT機器管理 <span class="badge bg-info text-dark">v2</span></span>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span id="dbStatus" class="badge bg-secondary">接続中...</span>
+      <span id="editorBadge" class="badge bg-secondary d-none"></span>
+      <button id="loginBtn" class="btn btn-sm btn-warning fw-bold" onclick="openLogin()"><i class="bi bi-unlock me-1"></i>編集モード</button>
+      <button id="logoutBtn" class="btn btn-sm btn-outline-secondary d-none" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
       <button class="btn btn-sm btn-outline-info" onclick="openSOP()"><i class="bi bi-question-circle me-1"></i>使い方</button>
-      <button class="btn btn-sm btn-outline-light" onclick="openConfig()"><i class="bi bi-gear"></i> 設定</button>
+      <button id="configBtn" class="btn btn-sm btn-outline-light d-none" onclick="openConfig()"><i class="bi bi-gear"></i></button>
     </div>
   </div>
 </nav>
 
 <div class="container-fluid p-3">
+
+  <!-- 今日やること -->
+  <div class="task-panel p-3 mb-3">
+    <div class="fw-bold mb-2"><i class="bi bi-list-check me-1 text-info"></i>今日やること <span class="readonly-note text-secondary ms-2" id="taskUpdated"></span></div>
+    <div id="taskList" class="d-flex flex-column gap-2">
+      <div class="text-secondary small">読み込み中...</div>
+    </div>
+  </div>
+
   <!-- サマリー -->
   <div class="row g-2 mb-3">
-    <div class="col-6 col-sm-3 col-xl-2">
-      <div class="card stat-card p-2 text-center">
-        <div class="fw-bold fs-3" id="cntTotal">-</div>
+    <div class="col-4 col-sm-2">
+      <div class="card stat-card p-2 text-center" onclick="setStatusChip('ALL')">
+        <div class="fw-bold fs-4" id="cntTotal">-</div>
         <div class="text-muted small">総台数</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3 col-xl-2">
-      <div class="card stat-card p-2 text-center" style="border-top:3px solid #ffc107">
-        <div class="fw-bold fs-3 text-warning" id="cntRepair">-</div>
-        <div class="text-muted small">修理中</div>
+    <div class="col-4 col-sm-2">
+      <div class="card stat-card p-2 text-center" style="border-top:3px solid #dc3545" onclick="setStatusChip('修理待ち')">
+        <div class="fw-bold fs-4 text-danger" id="cntWait">-</div>
+        <div class="text-muted small">修理待ち</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3 col-xl-2">
-      <div class="card stat-card p-2 text-center" style="border-top:3px solid #fd7e14">
-        <div class="fw-bold fs-3" style="color:#fd7e14" id="cntSim">-</div>
+    <div class="col-4 col-sm-2">
+      <div class="card stat-card p-2 text-center" style="border-top:3px solid #fd7e14" onclick="setStatusChip('SIM起票済み')">
+        <div class="fw-bold fs-4" style="color:#fd7e14" id="cntSim">-</div>
         <div class="text-muted small">SIM起票済み</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3 col-xl-2">
-      <div class="card stat-card p-2 text-center" style="border-top:3px solid #0d6efd">
-        <div class="fw-bold fs-3 text-primary" id="cntZebra">-</div>
-        <div class="text-muted small">Zebra登録済み</div>
+    <div class="col-4 col-sm-2">
+      <div class="card stat-card p-2 text-center" style="border-top:3px solid #0d6efd" onclick="setStatusChip('RMA登録済み')">
+        <div class="fw-bold fs-4 text-primary" id="cntRma">-</div>
+        <div class="text-muted small">RMA登録済み</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3 col-xl-2">
-      <div class="card stat-card p-2 text-center" style="border-top:3px solid #6f42c1">
-        <div class="fw-bold fs-3" style="color:#6f42c1" id="cntShipped">-</div>
+    <div class="col-4 col-sm-2">
+      <div class="card stat-card p-2 text-center" style="border-top:3px solid #6f42c1" onclick="setStatusChip('発送済み')">
+        <div class="fw-bold fs-4" style="color:#6f42c1" id="cntShipped">-</div>
         <div class="text-muted small">発送済み</div>
+      </div>
+    </div>
+    <div class="col-4 col-sm-2">
+      <div class="card stat-card p-2 text-center" style="border-top:3px solid #0dcaf0" onclick="setStatusChip('返却済み')">
+        <div class="fw-bold fs-4 text-info" id="cntReturned">-</div>
+        <div class="text-muted small">返却済み・要設定</div>
       </div>
     </div>
   </div>
@@ -92,75 +126,29 @@ body { background:#f0f4f8; font-size:.9rem; }
     <div class="d-flex flex-wrap gap-2 align-items-center">
       <div class="input-group" style="max-width:220px">
         <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-        <input type="text" id="searchInput" class="form-control" placeholder="ID / シリアル番号...">
+        <input type="text" id="searchInput" class="form-control" placeholder="ID / シリアル / 担当...">
       </div>
       <div id="typeFilters" class="d-flex flex-wrap gap-1">
         <span class="filter-chip active" data-type="ALL" onclick="setTypeFilter(this)">すべて</span>
         <span class="filter-chip" data-type="SSP" onclick="setTypeFilter(this)">SSP</span>
         <span class="filter-chip" data-type="FS" onclick="setTypeFilter(this)">FS</span>
         <span class="filter-chip" data-type="ZD611" onclick="setTypeFilter(this)">ZD611</span>
+        <span class="filter-chip" data-type="Radio" onclick="setTypeFilter(this)">無線機</span>
         <span class="filter-chip" data-type="Avery" onclick="setTypeFilter(this)">Avery</span>
         <span class="filter-chip" data-type="Handy" onclick="setTypeFilter(this)">Handy</span>
-        <span class="filter-chip" data-type="Radio" onclick="setTypeFilter(this)">無線機</span>
         <span class="filter-chip" data-type="PC" onclick="setTypeFilter(this)">PC</span>
         <span class="filter-chip" data-type="Mobile" onclick="setTypeFilter(this)">携帯</span>
       </div>
       <div id="statusFilters" class="d-flex flex-wrap gap-1 border-start ps-2">
         <span class="filter-chip active" data-status="ALL" onclick="setStatusFilter(this)">全ステータス</span>
         <span class="filter-chip" data-status="正常" onclick="setStatusFilter(this)">正常</span>
-        <span class="filter-chip" data-status="修理中" onclick="setStatusFilter(this)">修理中</span>
+        <span class="filter-chip" data-status="修理待ち" onclick="setStatusFilter(this)">修理待ち</span>
         <span class="filter-chip" data-status="SIM起票済み" onclick="setStatusFilter(this)">SIM起票済み</span>
-        <span class="filter-chip" data-status="Zebra登録済み" onclick="setStatusFilter(this)">Zebra登録済み</span>
+        <span class="filter-chip" data-status="RMA登録済み" onclick="setStatusFilter(this)">RMA登録済み</span>
         <span class="filter-chip" data-status="発送済み" onclick="setStatusFilter(this)">発送済み</span>
-        <span class="filter-chip" data-status="修理完了" onclick="setStatusFilter(this)">修理完了</span>
+        <span class="filter-chip" data-status="返却済み" onclick="setStatusFilter(this)">返却済み</span>
       </div>
       <span class="ms-auto text-muted small" id="countLabel">-</span>
-    </div>
-  </div>
-
-  <!-- クイックリンク集 -->
-  <div class="card mb-2 shadow-sm" id="quickLinksCard">
-    <div class="card-body py-2 px-3">
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <span class="fw-bold small text-muted me-1"><i class="bi bi-link-45deg me-1"></i>修理フロー リンク集</span>
-        <!-- SSP / TC57 -->
-        <span class="badge bg-warning text-dark fw-normal small">SSP / TC57</span>
-        <a href="https://t.corp.amazon.com/create/templates/c0bfd429-2e74-4998-ad75-c1d06b6e4092"
-           target="_blank" class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:.75rem">
-          <i class="bi bi-ticket-perforated me-1"></i>SIM起票テンプレート
-        </a>
-        <div class="vr mx-1"></div>
-        <!-- ZD611 -->
-        <span class="badge bg-danger fw-normal small">ZD611</span>
-        <a href="https://t.corp.amazon.com/create/templates/e75944fb-e00d-4557-9b91-795d48c49129"
-           target="_blank" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.75rem">
-          <i class="bi bi-ticket-perforated me-1"></i>SIM起票テンプレート
-        </a>
-        <div class="vr mx-1"></div>
-        <!-- Zebra 共通 -->
-        <span class="badge bg-primary fw-normal small">SSP / FS 共通</span>
-        <a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login"
-           target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem">
-          <i class="bi bi-tools me-1"></i>Zebra 修理ポータル
-        </a>
-        <span class="text-muted small font-monospace" title="Zebraポータル ログインアカウント">
-          <i class="bi bi-person-circle me-1 text-muted"></i>dej6-amzl-rma@amazon.com
-        </span>
-
-        <div class="vr mx-1"></div>
-        <span class="badge bg-info text-dark fw-normal small">SSP</span>
-        <a href="https://qr-app-iota.vercel.app/" target="_blank"
-           class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:.75rem">
-          <i class="bi bi-tablet me-1"></i>SSP管理ツール
-        </a>
-        <div class="ms-auto">
-          <button class="btn btn-sm btn-link text-muted p-0" style="font-size:.72rem"
-            onclick="document.getElementById('quickLinksCard').style.display='none'"
-            title="リンク集を非表示">
-            <i class="bi bi-x"></i>
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -169,21 +157,20 @@ body { background:#f0f4f8; font-size:.9rem; }
     <div class="table-container">
       <table class="table table-hover table-sm mb-0" id="deviceTable">
         <thead><tr>
+          <th width="30" id="thSelect" style="display:none"><input type="checkbox" class="select-cb" onclick="toggleAll(this)"></th>
           <th style="min-width:90px">機器ID</th>
           <th>種別</th>
-          <th>モデル</th>
-          <th>アセット</th>
-          <th>シリアル番号</th>
           <th>ステータス</th>
+          <th class="hide-sm">シリアル番号</th>
+          <th class="hide-sm">アセット</th>
           <th>担当者</th>
-          <th>Zebra RMA</th>
-          <th>MEMO</th>
+          <th class="hide-sm">RMA</th>
+          <th class="hide-sm">MEMO</th>
           <th width="36"></th>
         </tr></thead>
         <tbody id="deviceBody">
           <tr><td colspan="10" class="text-center py-5 text-muted">
-            <i class="bi bi-cloud-slash fs-3 d-block mb-2"></i>
-            右上「設定」からSupabaseに接続してください
+            <div class="spinner-border spinner-border-sm me-2"></div>読み込み中...
           </td></tr>
         </tbody>
       </table>
@@ -191,455 +178,147 @@ body { background:#f0f4f8; font-size:.9rem; }
   </div>
 </div>
 
-<!-- 使い方（SOP）モーダル -->
-<div class="modal fade" id="sopModal" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+<!-- 一括操作バー -->
+<div id="bulkBar">
+  <div class="d-flex flex-wrap align-items-center gap-2 container-fluid">
+    <span class="fw-bold"><i class="bi bi-check2-square me-1"></i><span id="bulkCount">0</span>台選択中</span>
+    <div class="vr"></div>
+    <div id="bulkActions" class="d-flex flex-wrap gap-2"></div>
+    <button class="btn btn-sm btn-outline-light ms-auto" onclick="clearSelection()">選択解除</button>
+  </div>
+</div>
+
+<!-- ログインモーダル -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
     <div class="modal-content">
-      <div class="modal-header" style="background:#1e293b">
-        <h5 class="modal-title fw-bold text-white"><i class="bi bi-book me-2 text-info"></i>DEJ6 IT機器管理システム — 使い方（SOP）</h5>
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-unlock me-2"></i>編集モード</h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body p-4">
-
-        <!-- 概要 -->
-        <div class="alert alert-info d-flex gap-2 align-items-start mb-4">
-          <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
-          <div>
-            <strong>このシステムについて</strong><br>
-            Quip管理表の後継システムです。DEJ6のIT機器（SSP / FS / ZD611 / Avery / Handy / 無線機 / PC / 携帯）479台のステータスをリアルタイムで管理します。<br>
-            URLはブックマーク推奨：<code>https://trainboy1120-jpg.github.io/dej6-it-mgmt/</code>
-          </div>
-        </div>
-
-        <!-- STEP 0: 初回セットアップ -->
-        <div class="card mb-4 border-warning">
-          <div class="card-header fw-bold" style="background:#fff3cd">
-            <i class="bi bi-gear me-2"></i>STEP 0 — 初回セットアップ（初回のみ）
-          </div>
-          <div class="card-body">
-            <ol class="mb-0">
-              <li class="mb-2">右上の <span class="badge bg-secondary"><i class="bi bi-gear"></i> 設定</span> ボタンをクリック</li>
-              <li class="mb-2">以下を入力して「保存して接続」：
-                <table class="table table-sm table-bordered mt-2 mb-0">
-                  <tbody>
-                    <tr><th class="bg-light" style="width:140px">Supabase URL</th><td><code>https://tetigwcotdqgkwfswbyc.supabase.co</code></td></tr>
-                    <tr><th class="bg-light">API Key</th><td>※ IT POCメンバーに確認してください（anon public key）</td></tr>
-                    <tr><th class="bg-light">担当者エイリアス</th><td>自分のAmazonエイリアスを入力（例: <code>sakrhiro</code>）</td></tr>
-                  </tbody>
-                </table>
-              </li>
-              <li>右上のバッジが <span class="badge bg-success">接続済み</span> になれば完了</li>
-            </ol>
-          </div>
-        </div>
-
-        <!-- STEP 1: 画面の見方 -->
-        <div class="card mb-4 border-primary">
-          <div class="card-header fw-bold text-white" style="background:#0d6efd">
-            <i class="bi bi-layout-text-window me-2"></i>STEP 1 — 画面の見方
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <h6 class="fw-bold">① サマリーカード（上部）</h6>
-                <table class="table table-sm table-bordered">
-                  <tbody>
-                    <tr><td>総台数</td><td>全機器数</td></tr>
-                    <tr><td class="text-warning fw-bold">修理中</td><td>現在修理対応中の台数</td></tr>
-                    <tr><td style="color:#fd7e14" class="fw-bold">SIM起票済み</td><td>SIM（社内チケット）を起票した台数</td></tr>
-                    <tr><td class="text-primary fw-bold">Zebra登録済み</td><td>Zebraポータルに修理登録した台数</td></tr>
-                    <tr><td style="color:#6f42c1" class="fw-bold">発送済み</td><td>Zebraへ発送済みの台数</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="col-md-6">
-                <h6 class="fw-bold">② フィルター・検索</h6>
-                <ul class="mb-0">
-                  <li><strong>種別チップ</strong>（SSP / FS / ZD611...）: 機器の種類で絞り込み</li>
-                  <li><strong>ステータスチップ</strong>（全ステータス / 正常 / 修理中...）: 状態で絞り込み</li>
-                  <li><strong>検索ボックス</strong>: 機器ID・シリアル番号・アセット番号・MEMOでキーワード検索</li>
-                </ul>
-                <div class="alert alert-light border mt-2 mb-0 py-2 small">
-                  💡 「修理中」フィルターを押すと現在対応が必要な機器だけ一覧表示できます
-                </div>
-              </div>
-              <div class="col-12">
-                <h6 class="fw-bold">③ テーブルの列</h6>
-                <div class="table-responsive">
-                  <table class="table table-sm table-bordered">
-                    <thead class="table-dark"><tr><th>列名</th><th>内容</th></tr></thead>
-                    <tbody>
-                      <tr><td><strong>機器ID</strong></td><td>システム内の識別ID（例: SSP-001, FS-13）。クリックでステータス更新モーダルを開く</td></tr>
-                      <tr><td><strong>種別</strong></td><td>SSP / FS / ZD611 / Avery / Handy / 無線機 / PC / 携帯</td></tr>
-                      <tr><td><strong>アセット</strong></td><td>資産管理番号（AMZL番号）</td></tr>
-                      <tr><td><strong>シリアル番号</strong></td><td>機器固有のシリアルナンバー</td></tr>
-                      <tr><td><strong>ステータス</strong></td><td>現在の状態（下記フロー参照）</td></tr>
-                      <tr><td><strong>担当者</strong></td><td>対応した担当者のエイリアス</td></tr>
-                      <tr><td><strong>Zebra RMA</strong></td><td>Zebra修理受付番号</td></tr>
-                      <tr><td><strong>MEMO</strong></td><td>不具合詳細・SIM URLなど（30文字で省略表示）</td></tr>
-                      <tr><td><i class="bi bi-clock-history"></i></td><td>その機器の修理履歴を表示</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 2: 修理フロー -->
-        <div class="card mb-4 border-danger">
-          <div class="card-header fw-bold text-white bg-danger">
-            <i class="bi bi-arrow-right-circle me-2"></i>STEP 2 — 修理フロー（ステータスの流れ）
-          </div>
-          <div class="card-body">
-            <div class="d-flex flex-wrap align-items-center gap-1 mb-3 fs-6">
-              <span class="status-badge status-正常">正常</span>
-              <i class="bi bi-arrow-right text-muted"></i>
-              <span class="status-badge status-修理中">修理中</span>
-              <i class="bi bi-arrow-right text-muted"></i>
-              <span class="status-badge status-SIM起票済み">SIM起票済み</span>
-              <span class="text-muted small">（SSPのみ）</span>
-              <i class="bi bi-arrow-right text-muted"></i>
-              <span class="status-badge status-Zebra登録済み">Zebra登録済み</span>
-              <i class="bi bi-arrow-right text-muted"></i>
-              <span class="status-badge status-発送済み">発送済み</span>
-              <i class="bi bi-arrow-right text-muted"></i>
-              <span class="status-badge status-修理完了">修理完了</span>
-              <i class="bi bi-arrow-right text-muted"></i>
-              <span class="status-badge status-正常">正常</span>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-bordered table-sm">
-                <thead class="table-dark"><tr><th>ステータス</th><th>やること</th><th>入力項目</th><th>注意点</th></tr></thead>
-                <tbody>
-                  <tr>
-                    <td><span class="status-badge status-修理中">修理中</span></td>
-                    <td>機器の不具合を発見した時、最初に設定</td>
-                    <td>不具合カテゴリー・不具合詳細・担当者</td>
-                    <td>—</td>
-                  </tr>
-                  <tr>
-                    <td><span class="status-badge status-SIM起票済み">SIM起票済み</span></td>
-                    <td>社内SIM（t.corp）にチケットを起票したら設定</td>
-                    <td>SIM URL（必須）・担当者</td>
-                    <td><strong>FSはこのステップをスキップ</strong>してZebra登録済みへ</td>
-                  </tr>
-                  <tr>
-                    <td><span class="status-badge status-Zebra登録済み">Zebra登録済み</span></td>
-                    <td><a href="https://repair.zebra.com" target="_blank">Zebraポータル</a>に修理登録したら設定</td>
-                    <td>RMA番号（必須）・担当者</td>
-                    <td>備考欄に<strong>「スワップ禁止」</strong>と記入すること（必須）</td>
-                  </tr>
-                  <tr>
-                    <td><span class="status-badge status-発送済み">発送済み</span></td>
-                    <td>ヤマトで発送したら設定</td>
-                    <td>発送日（必須）・伝票番号・RMA番号・担当者</td>
-                    <td>Slackプレビューが自動生成 → #dej6-it-poc にコピー送信</td>
-                  </tr>
-                  <tr>
-                    <td><span class="status-badge status-修理完了">修理完了</span></td>
-                    <td>Zebraから機器が返却されたら設定</td>
-                    <td>返却日・担当者</td>
-                    <td>Slackプレビューが自動生成 → #dej6-it-poc にコピー送信</td>
-                  </tr>
-                  <tr>
-                    <td><span class="status-badge status-正常">正常に戻す</span></td>
-                    <td>修理完了後・再稼働時に設定</td>
-                    <td>なし</td>
-                    <td>RMA・シリアル等の修理関連データはクリアされる</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 3: ステータス更新の操作手順 -->
-        <div class="card mb-4 border-success">
-          <div class="card-header fw-bold text-white bg-success">
-            <i class="bi bi-pencil-square me-2"></i>STEP 3 — ステータス更新の操作手順
-          </div>
-          <div class="card-body">
-            <ol>
-              <li class="mb-2">テーブルで対象の機器行を<strong>クリック</strong>（どこをクリックしてもOK）</li>
-              <li class="mb-2">「ステータス更新」モーダルが開く → 現在の機器情報を確認</li>
-              <li class="mb-2">新しいステータスボタンを選択（例: <kbd>修理中</kbd>）</li>
-              <li class="mb-2">表示されたフォームに必要事項を入力</li>
-              <li class="mb-2">「発送済み」「修理完了」の場合：Slackプレビューを確認 → <kbd>コピーして #dej6-it-poc に貼り付け</kbd> ボタンでコピー → Slackに貼り付けて送信</li>
-              <li><strong class="text-success">保存する</strong> ボタンをクリック → テーブルが自動更新される</li>
-            </ol>
-            <div class="alert alert-warning py-2 mb-0 small">
-              <i class="bi bi-exclamation-triangle me-1"></i>
-              <strong>保存前にモーダルを閉じると変更は破棄されます。</strong>必ず「保存する」まで操作してください。
-            </div>
-          </div>
-        </div>
-
-        <!-- 更新履歴 -->
-        <div class="card mb-4 border-info">
-          <div class="card-header fw-bold" style="background:#cff4fc">
-            <i class="bi bi-clock-history me-2"></i>更新履歴（主な変更点）
-          </div>
-          <div class="card-body p-0">
-            <table class="table table-sm table-bordered mb-0">
-              <thead class="table-dark">
-                <tr><th style="width:120px">日付</th><th>変更内容</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="text-nowrap">2026-06-13</td>
-                  <td>
-                    <strong>SSP管理ツール（Firebase）とリアルタイム連携を追加</strong><br>
-                    <span class="text-muted small">SSP行のステータス列に稼働状況バッジ（空き / 使用中 / 故障登録）を表示。Yamashita-san作のSSP管理ツール（Firebase）から自動取得。</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="text-nowrap">2026-06-13</td>
-                  <td>
-                    <strong>修理フロー リンク集を追加</strong><br>
-                    <span class="text-muted small">テーブル上部に常時表示のリンク集（SIM起票テンプレート / Zebraポータル / SSP管理ツール）を追加。</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="text-nowrap">2026-06-13</td>
-                  <td>
-                    <strong>使い方（SOP）モーダルを追加</strong><br>
-                    <span class="text-muted small">ナビバーの「使い方」ボタンからアクセス可能。操作手順・修理フロー・FAQを内蔵。</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="text-nowrap">2026-06-13</td>
-                  <td>
-                    <strong>システム初公開（Quip管理表の後継）</strong><br>
-                    <span class="text-muted small">479台（SSP/FS/ZD611/Avery/Handy/無線機/PC/携帯）のステータス管理・修理フロー・履歴記録・Slack通知機能を実装。</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- FAQ -->
-        <div class="card mb-0 border-secondary">
-          <div class="card-header fw-bold bg-light">
-            <i class="bi bi-patch-question me-2"></i>よくある質問（FAQ）
-          </div>
-          <div class="card-body">
-            <div class="accordion accordion-flush" id="faqAccordion">
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
-                    「未接続」のままでデータが見えない
-                  </button>
-                </h2>
-                <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    初回は設定が必要です。右上「設定」ボタン → Supabase URL と API Key を入力 → 「保存して接続」。API KeyはIT POCメンバーに確認してください。
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
-                    FSの修理フローはSSPと何が違う？
-                  </button>
-                </h2>
-                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    FSはSIM（社内チケット）の起票が不要です。修理中 → <strong>Zebra登録済み → 発送済み → 修理完了 → 正常</strong> の流れで進めてください。SIM起票済みを選ぶと警告メッセージが表示されます。
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
-                    Zebraポータルの「スワップ禁止」とは？
-                  </button>
-                </h2>
-                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    Zebraの修理では機器交換（スワップ）が行われることがあります。Amazonの資産管理上、同一シリアル番号の機器が戻ってこないと管理が崩れるため、<strong>必ず備考欄に「スワップ禁止」と記入</strong>してください。
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
-                    修理履歴はどこで確認できる？
-                  </button>
-                </h2>
-                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    各行の右端にある <i class="bi bi-clock-history"></i> ボタンをクリックすると、その機器の全ステータス変更履歴が時系列で確認できます。
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
-                    設定（URLとAPIキー）はどこに保存されている？
-                  </button>
-                </h2>
-                <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    ブラウザのlocalStorageに保存されています。同じPC・同じブラウザなら再入力不要です。別のPC・別のブラウザでは初回設定が必要です。シークレットモードでは保存されません。
-                  </div>
-                </div>
-              </div>
-            </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
-                    SSPの行に表示される「空き」「使用中」「故障登録」のバッジは何？
-                  </button>
-                </h2>
-                <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    Yamashita-sanが作成したSSP管理ツール（<a href="https://qr-app-iota.vercel.app/" target="_blank">qr-app-iota.vercel.app</a>）の稼働状況をリアルタイムで取得して表示しています。<br>
-                    <ul class="mb-0 mt-1">
-                      <li><span class="fb-available">空き</span>：誰も使用していない状態</li>
-                      <li><span class="fb-rented">使用中</span>：QRスキャンで貸出中。バッジにカーソルを当てると担当者名が表示されます</li>
-                      <li><span class="fb-broken">故障登録</span>：SSP管理ツール上で故障登録された状態</li>
-                    </ul>
-                    ページを再読み込みすると最新状態に更新されます。
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq7">
-                    SSPの稼働状況バッジが表示されない
-                  </button>
-                </h2>
-                <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    以下を確認してください：
-                    <ul class="mb-0">
-                      <li>Supabaseに接続済み（右上バッジが「接続済み」）かどうか</li>
-                      <li>ページを一度再読み込みする</li>
-                      <li>FS・ZD611など SSP以外の機器にはバッジは表示されません（SSP専用機能です）</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq8">
-                    「故障登録」バッジと「修理中」ステータスの違いは？
-                  </button>
-                </h2>
-                <div id="faq8" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    <table class="table table-sm table-bordered mb-0">
-                      <thead class="table-dark"><tr><th>表示</th><th>どのツールの情報</th><th>意味</th></tr></thead>
-                      <tbody>
-                        <tr><td><span class="fb-broken">故障登録</span></td><td>SSP管理ツール（Yamashita-san作）</td><td>現場担当者がQRスキャンで故障登録した状態</td></tr>
-                        <tr><td><span class="status-badge status-修理中">修理中</span></td><td>このシステム（IT機器管理）</td><td>IT POCが修理フローを開始した状態</td></tr>
-                      </tbody>
-                    </table>
-                    <div class="alert alert-warning py-1 small mt-2 mb-0">
-                      <i class="bi bi-exclamation-triangle me-1"></i>
-                      「故障登録」が付いているSSPは、このシステムでも「修理中」に更新してください。
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#faq9">
-                    SSP管理ツールとこのシステム、どちらで管理するの？
-                  </button>
-                </h2>
-                <div id="faq9" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body py-2 small">
-                    <strong>役割分担があります。</strong>
-                    <ul class="mb-0 mt-1">
-                      <li><strong>SSP管理ツール</strong>：現場オペレーションの貸出・返却・故障登録（QRスキャンで誰でも操作可能）</li>
-                      <li><strong>このシステム</strong>：IT POC担当者による修理フロー管理（Zebra送付・SIM起票・発送追跡）</li>
-                    </ul>
-                    故障が発生したら、SSP管理ツールで故障登録 → このシステムで修理フローを進める、という2段階の運用です。
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div class="modal-body">
+        <div class="alert alert-light border small py-2">SA / IT POCメンバー専用。PINは #dej6-it-poc で共有されています。</div>
+        <label class="form-label fw-semibold small">エイリアス</label>
+        <input type="text" class="form-control mb-2" id="loginAlias" placeholder="例: sakrhiro" autocomplete="off">
+        <label class="form-label fw-semibold small">共有PIN</label>
+        <input type="password" class="form-control" id="loginPin" onkeydown="if(event.key==='Enter')doLogin()">
+        <div id="loginErr" class="text-danger small mt-2 d-none">PINが違います</div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+      <div class="modal-footer py-2">
+        <button class="btn btn-primary btn-sm w-100" onclick="doLogin()">ログイン</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ステータス更新モーダル -->
+<!-- ステータス更新モーダル(単体) -->
 <div class="modal fade" id="statusModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2 text-primary"></i>ステータス更新</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-pencil-square me-2"></i><span id="mDeviceId"></span> <span id="mType" class="ms-1"></span> <small class="text-secondary ms-2" id="mModel"></small></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="p-2 rounded mb-3" style="background:#f8fafc;border:1px solid #e2e8f0">
-          <div class="d-flex flex-wrap gap-3 mb-2">
-            <div><span class="text-muted small">機器ID:</span> <strong id="mDeviceId" class="text-primary fs-6"></strong></div>
-            <div><span class="text-muted small">種別:</span> <span id="mType"></span></div>
-            <div><span class="text-muted small">モデル:</span> <span id="mModel"></span></div>
-            <div><span class="text-muted small">現在:</span> <span id="mCurrentStatus"></span></div>
-          </div>
-          <div class="row g-2">
-            <div class="col-sm-6">
-              <label class="form-label small text-muted mb-1">シリアル番号 <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
-              <input type="text" class="form-control form-control-sm font-monospace" id="mSerialInput" oninput="checkDirty()" placeholder="シリアル番号">
-            </div>
-            <div class="col-sm-6">
-              <label class="form-label small text-muted mb-1">アセット番号 <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
-              <input type="text" class="form-control form-control-sm font-monospace" id="mAssetInput" oninput="checkDirty()" placeholder="アセット番号">
-            </div>
-            <div class="col-12">
-              <label class="form-label small text-muted mb-1">メモ（備考） <i class="bi bi-pencil-fill text-primary" style="font-size:.6rem"></i> 編集可</label>
-              <textarea class="form-control form-control-sm" id="mMemoInput" rows="2" oninput="checkDirty()" placeholder="例: スワップ禁止 / 設置場所 など"></textarea>
-            </div>
-          </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-3"><label class="form-label small text-muted mb-0">現在</label><div id="mCurrentStatus"></div></div>
+          <div class="col-md-4"><label class="form-label small text-muted mb-0">シリアル</label>
+            <input type="text" class="form-control form-control-sm font-monospace" id="mSerialInput" oninput="checkDirty()"></div>
+          <div class="col-md-3"><label class="form-label small text-muted mb-0">アセット</label>
+            <input type="text" class="form-control form-control-sm font-monospace" id="mAssetInput" oninput="checkDirty()"></div>
+          <div class="col-md-2"><label class="form-label small text-muted mb-0">滞留</label><div id="mDays" class="pt-1"></div></div>
         </div>
-        <div class="mb-3">
-          <div class="form-label fw-bold mb-2">新しいステータスを選択</div>
-          <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-warning" onclick="selectStatus('修理中')"><i class="bi bi-tools me-1"></i>修理中</button>
-            <button class="btn btn-outline-warning text-dark" style="border-color:#fd7e14" onclick="selectStatus('SIM起票済み')"><i class="bi bi-ticket-perforated me-1"></i>SIM起票済み</button>
-            <button class="btn btn-outline-primary" onclick="selectStatus('Zebra登録済み')"><i class="bi bi-clipboard-check me-1"></i>Zebra登録済み</button>
-            <button class="btn btn-outline-secondary" style="--bs-btn-hover-border-color:#6f42c1;--bs-btn-hover-color:#6f42c1" onclick="selectStatus('発送済み')"><i class="bi bi-send me-1"></i>発送済み</button>
-            <button class="btn btn-outline-info" onclick="selectStatus('修理完了')"><i class="bi bi-check-circle me-1"></i>修理完了（返却）</button>
-            <button class="btn btn-outline-success" onclick="selectStatus('正常')"><i class="bi bi-arrow-counterclockwise me-1"></i>正常に戻す</button>
-          </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-0">MEMO</label>
+          <input type="text" class="form-control form-control-sm" id="mMemoInput" oninput="checkDirty()">
         </div>
-        <div id="selectedStatusBadge" class="mb-3" style="display:none">
-          <span class="text-muted small">選択中:</span> <span id="selStatusLabel"></span>
+        <hr>
+        <div class="fw-semibold small mb-2">ステータスを変更 <span class="text-muted">(この機種のフロー順)</span></div>
+        <div id="statusBtns" class="d-flex flex-wrap gap-2 mb-3"></div>
+        <div id="selectedStatusBadge" style="display:none" class="mb-2">
+          <i class="bi bi-arrow-right-circle text-success me-1"></i><span id="selStatusLabel"></span>
         </div>
         <div id="dynamicForm"></div>
         <div id="slackPreviewArea" style="display:none" class="mt-3">
-          <div class="form-label fw-bold"><i class="bi bi-slack me-1" style="color:#4a154b"></i>Slack投稿メッセージ <span class="badge bg-secondary">プレビュー</span></div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="fw-semibold small"><i class="bi bi-slack me-1"></i>Slack共有用テキスト</span>
+            <span class="text-muted readonly-note" id="slackNote"></span>
+            <button class="btn btn-sm btn-outline-dark py-0 ms-auto" onclick="copySlack()"><i class="bi bi-clipboard me-1"></i>コピー</button>
+          </div>
           <div class="slack-preview" id="slackPreview"></div>
-          <div class="d-flex gap-2 mt-2 align-items-center">
-            <button class="btn btn-sm fw-bold" style="background:#4a154b;color:#fff" onclick="copySlack()">
-              <i class="bi bi-clipboard me-1"></i>コピーして #dej6-it-poc に貼り付け
-            </button>
-            <span id="slackAutoArea" style="display:none">
-              <button class="btn btn-sm btn-success" onclick="sendSlack()">
-                <i class="bi bi-lightning me-1"></i>自動送信
-              </button>
-            </span>
-            <small class="text-muted" id="slackNote"></small>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
+        <button class="btn btn-success btn-sm px-4" id="saveBtn" onclick="saveStatus()" disabled><i class="bi bi-check-lg me-1"></i>保存する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 一括操作モーダル -->
+<div class="modal fade" id="bulkModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-collection me-2"></i>一括操作: <span id="bulkModalTitle"></span></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="bulkDeviceList" class="mb-3 small"></div>
+        <div id="bulkForm"></div>
+        <div id="bulkGenArea" class="mt-3" style="display:none">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="fw-semibold small" id="bulkGenLabel"></span>
+            <button class="btn btn-sm btn-outline-dark py-0 ms-auto" onclick="copyBulkGen()"><i class="bi bi-clipboard me-1"></i>コピー</button>
+          </div>
+          <div class="slack-preview" id="bulkGenText" style="max-height:260px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="modal-footer py-2 flex-wrap">
+        <div id="bulkExtraBtns" class="me-auto d-flex gap-2"></div>
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
+        <button class="btn btn-success btn-sm px-4" id="bulkSaveBtn" onclick="saveBulk()"><i class="bi bi-check-lg me-1"></i>一括保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル(編集者のみ / 全員共有のマスタ) -->
+<div class="modal fade" id="configModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-gear me-2"></i>マスタ設定(全員に反映されます)</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Zebra社 送付先住所 (SSP/FS/ZD611のManifest宛先)</label>
+            <textarea class="form-control form-control-sm" id="cfgAddrZebra" rows="4"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">TYO4青梅 送付先住所 (無線機ほかのManifest宛先)</label>
+            <textarea class="form-control form-control-sm" id="cfgAddrTyo4" rows="4"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">返送先住所 (DEJ6 — Manifestに記載)</label>
+            <textarea class="form-control form-control-sm" id="cfgAddrReturn" rows="4"></textarea>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">滞留アラート日数</label>
+            <input type="number" class="form-control form-control-sm" id="cfgStagDays" min="1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">修理待ちアラート閾値(台)</label>
+            <input type="number" class="form-control form-control-sm" id="cfgThreshold" min="1">
           </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-        <button class="btn btn-primary" onclick="saveStatus()" id="saveBtn" disabled>
-          <i class="bi bi-check2 me-1"></i>保存する
-        </button>
+      <div class="modal-footer py-2">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
+        <button class="btn btn-primary btn-sm px-4" onclick="saveConfig()"><i class="bi bi-check-lg me-1"></i>保存</button>
       </div>
     </div>
   </div>
@@ -647,52 +326,13 @@ body { background:#f0f4f8; font-size:.9rem; }
 
 <!-- 履歴モーダル -->
 <div class="modal fade" id="historyModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-scrollable">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>修理履歴 — <span id="hDeviceId"></span></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-clock-history me-2"></i>修理履歴: <span id="hDeviceId"></span></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="historyBody"></div>
-    </div>
-  </div>
-</div>
-
-<!-- 設定モーダル -->
-<div class="modal fade" id="configModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-gear me-2"></i>接続設定</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-info small py-2">設定はブラウザのローカルストレージに保存されます。</div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Supabase URL <span class="text-danger">*</span></label>
-          <input type="url" id="cfgUrl" class="form-control font-monospace" placeholder="https://xxxx.supabase.co">
-          <div class="form-text">Supabase管理画面 → Settings → API → Project URL</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Supabase Anon Key <span class="text-danger">*</span></label>
-          <input type="password" id="cfgKey" class="form-control font-monospace" placeholder="eyJhbGciOi...">
-          <div class="form-text">同じ画面の「anon public」キー</div>
-        </div>
-        <hr>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Slack Incoming Webhook URL <span class="badge bg-secondary">任意</span></label>
-          <input type="url" id="cfgSlack" class="form-control font-monospace" placeholder="https://hooks.slack.com/services/...">
-          <div class="form-text">設定すると発送済み・修理完了時に #dej6-it-poc へ自動投稿します。<br>未設定の場合はコピー＆ペースト方式になります。</div>
-        </div>
-        <div class="mb-2">
-          <label class="form-label fw-bold">担当者エイリアス</label>
-          <input type="text" id="cfgAlias" class="form-control" placeholder="例: sakrhiro">
-          <div class="form-text">ステータス更新時の担当者欄に自動入力されます。</div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-        <button class="btn btn-primary" onclick="saveConfig()"><i class="bi bi-check2 me-1"></i>保存・接続</button>
-      </div>
     </div>
   </div>
 </div>
@@ -707,206 +347,315 @@ body { background:#f0f4f8; font-size:.9rem; }
   </div>
 </div>
 
+<!-- 使い方(SOP)モーダル -->
+<div class="modal fade" id="sopModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1e293b">
+        <h5 class="modal-title fw-bold text-white"><i class="bi bi-book me-2 text-info"></i>DEJ6 IT機器管理 v2 — 使い方</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert alert-info small">
+          <strong>v2の基本思想:</strong> 記録・書類・通知は自動。人がやるのは物理作業(箱詰め・発送・受取・設定)だけ。<br>
+          閲覧は<strong>設定不要</strong>(このURLを開くだけ)。更新するには右上「編集モード」からエイリアス+共有PINでログイン。
+        </div>
+        <h6 class="fw-bold mt-3"><i class="bi bi-1-circle me-1"></i>故障発生 → 自動で「修理待ち」になる</h6>
+        <p class="small mb-2">SSPはqr-app(SSP管理ツール)で故障登録されると<strong>30分以内に自動でこのツールに反映</strong>されます。FS/ZD611/無線機は一覧から機器をタップして手動で「修理待ち」に。</p>
+        <h6 class="fw-bold mt-3"><i class="bi bi-2-circle me-1"></i>「今日やること」パネルに従う</h6>
+        <table class="table table-sm table-bordered small">
+          <thead class="table-dark"><tr><th>タスク</th><th>操作</th><th>自動化されること</th></tr></thead>
+          <tbody>
+            <tr><td>SIM起票</td><td>ボタン1つでSIM本文を自動生成→テンプレを開いて貼るだけ</td><td>シリアル/アセット/症状の転記</td></tr>
+            <tr><td>Zebra RMA登録</td><td>登録用データ表をコピー→<a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login" target="_blank">Zebraポータル</a>に貼る (アカウント: dej6-amzl-rma@amazon.com / 備考に<strong>「スワップ禁止」</strong>必須)</td><td>登録データの整形・英訳</td></tr>
+            <tr><td>発送</td><td>一括選択→発送済み→<strong>Shipping Manifest自動印刷</strong>して同梱</td><td>Manifest作成・宛先切替(Zebra社/TYO4)・Slack共有文</td></tr>
+            <tr><td>返却受取</td><td>「返却済み」→設定完了したら「正常」へ</td><td>朝のダイジェストで要設定台数をリマインド</td></tr>
+          </tbody>
+        </table>
+        <h6 class="fw-bold mt-3"><i class="bi bi-3-circle me-1"></i>機種ごとの修理フロー(Wiki準拠)</h6>
+        <table class="table table-sm table-bordered small">
+          <thead class="table-dark"><tr><th>機種</th><th>フロー</th><th>送付先</th></tr></thead>
+          <tbody>
+            <tr><td>SSP(TC57) / ZD611</td><td>修理待ち→SIM起票→RMA登録→発送→返却→正常</td><td>Zebra社 (Direct RMA)</td></tr>
+            <tr><td>FS(RS5100)</td><td>修理待ち→RMA登録→発送→返却→正常 <strong>(SIM不要)</strong></td><td>Zebra社 (Direct RMA)</td></tr>
+            <tr><td>無線機(Kenwood)</td><td>修理待ち→SIM起票→発送→返却→正常</td><td>TYO4青梅FC IT宛</td></tr>
+            <tr><td>Avery/Handy/PC/携帯</td><td>修理待ち→SIM起票→発送→返却→正常</td><td>TYO4青梅FC IT宛 (SIMの指示に従う)</td></tr>
+          </tbody>
+        </table>
+        <div class="alert alert-warning small mb-2">
+          <i class="bi bi-exclamation-triangle me-1"></i><strong>発送時の鉄則:</strong>
+          ① Shipping Manifestを必ず同梱 ② Manifestの返送先住所を確認 ③ Zebra備考に「スワップ禁止」
+          ④ <strong>膨張・破損バッテリーは発送禁止</strong>(サイト内e-wasteルールで廃棄)
+        </div>
+        <h6 class="fw-bold mt-3"><i class="bi bi-robot me-1"></i>自動で動いているもの</h6>
+        <ul class="small">
+          <li>30分毎: qr-app故障登録⇔このツールの同期 (GitHub Actions)</li>
+          <li>毎朝8:00: #dej6-it-poc へダイジェスト投稿 (修理待ち/滞留/実箱との突合)</li>
+          <li>ステータス変更はすべて履歴に記録(誰が・いつ・何を)</li>
+        </ul>
+        <p class="small text-muted mb-0">管理: sakrhiro / リポジトリ: github.com/trainboy1120-jpg/dej6-it-mgmt</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+<script>
+'use strict'
+// ════════════════════════════════════════════════════
+// DEJ6 IT機器管理 v2  @author sakrhiro (built with Aki)
+// ════════════════════════════════════════════════════
 
-let sb = null, allDevices = [], currentDevice = null
-let selectedStatus = null, typeFilter = 'ALL', statusFilter = 'ALL'
+// ─── 埋め込み設定(ゼロセットアップ) ──────────────────
+const SB_URL  = 'https://tetigwcotdqgkwfswbyc.supabase.co'
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRldGlnd2NvdGRxZ2t3ZnN3YnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzQxNDgsImV4cCI6MjA5Njg1MDE0OH0.8akyRPHCOX3wfKdIqvoaJdq2D8i--Z1jBLS2RLJOuaQ'
+const FB_URL  = 'https://ssp-rental-default-rtdb.asia-southeast1.firebasedatabase.app'
+// 編集PINのSHA-256ハッシュ(salt付き)。PIN本体は #dej6-it-poc で共有
+const PIN_SALT = 'dej6-it-mgmt::'
+const PIN_HASH = '3198679d1cdbf56cb76b56a1369a126aea6fb97b599d70659d57e14e713d3820'
 
+// ─── 機種別フロー定義(JP-OTS Wiki 2026-07確認) ────────
+const FLOWS = {
+  SSP:    ['修理待ち','SIM起票済み','RMA登録済み','発送済み','返却済み','正常'],
+  ZD611:  ['修理待ち','SIM起票済み','RMA登録済み','発送済み','返却済み','正常'],
+  FS:     ['修理待ち','RMA登録済み','発送済み','返却済み','正常'],
+  Radio:  ['修理待ち','SIM起票済み','発送済み','返却済み','正常'],
+  Avery:  ['修理待ち','SIM起票済み','発送済み','返却済み','正常'],
+  Handy:  ['修理待ち','SIM起票済み','発送済み','返却済み','正常'],
+  PC:     ['修理待ち','SIM起票済み','発送済み','返却済み','正常'],
+  Mobile: ['修理待ち','SIM起票済み','発送済み','返却済み','正常'],
+}
+const SIM_TEMPLATES = {
+  SSP:    'https://t.corp.amazon.com/create/templates/c0bfd429-2e74-4998-ad75-c1d06b6e4092',
+  ZD611:  'https://t.corp.amazon.com/create/templates/e75944fb-e00d-4557-9b91-795d48c49129',
+  Radio:  'https://t.corp.amazon.com/create/templates/a68830bd-3f72-4397-bd38-d105c3a79ee3',
+  Handy:  'https://t.corp.amazon.com/create/templates/a3cc0dd4-fa3f-4e2f-98f9-e9c178b04a20',
+  Mobile: 'https://t.corp.amazon.com/create/templates/9e0039cc-1adf-4620-87f4-312384d97bb5',
+}
+// Zebra Direct RMA対象(発送先=Zebra社)。それ以外はTYO4青梅
+const ZEBRA_TYPES = ['SSP','FS','ZD611']
+// 旧ステータス名 → v2名 (マイグレーション前の表示互換)
+const LEGACY = { '修理中':'修理待ち', 'Zebra登録済み':'RMA登録済み', '修理完了':'返却済み' }
 const DEFECT_CATS = ['充電不良','電源が入らない','スキャン不良','ログイン不可',
-  'ペアリング不可','画面不良','トリガー破損','接続不良','その他']
+  'ペアリング不可','画面不良','トリガー破損','ベルト破損','接続不良','その他']
+// Zebra RMA登録用の症状英訳
+const DEFECT_EN = {
+  '充電不良':'Charging failure', '電源が入らない':'No power', 'スキャン不良':'Scanning failure',
+  'ログイン不可':'Cannot login', 'ペアリング不可':'Pairing failure', '画面不良':'Display issue',
+  'トリガー破損':'Broken trigger', 'ベルト破損':'Broken strap', '接続不良':'Connection issue', 'その他':'Other'
+}
+const TYPE_LABEL = { Radio:'無線機', Mobile:'携帯' }
 
-// ─── 設定 ─────────────────────────────────────────
-function cfg() {
-  return {
-    url:   localStorage.getItem('dej6_sb_url')   || '',
-    key:   localStorage.getItem('dej6_sb_key')   || '',
-    slack: localStorage.getItem('dej6_slack')    || '',
-    alias: localStorage.getItem('dej6_alias')    || '',
-  }
+// ─── 状態 ─────────────────────────────────────────
+let allDevices = [], fbItems = {}, appCfg = {}, currentDevice = null
+let selectedStatus = null, typeFilter = 'ALL', statusFilter = 'ALL'
+let selection = new Set(), bulkTarget = null, bulkDevices = []
+
+function editor() {
+  try { return JSON.parse(localStorage.getItem('dej6_editor_v2') || 'null') } catch(e){ return null }
+}
+function isEditor(){ const e = editor(); return !!(e && e.ok && e.alias) }
+function myAlias(){ const e = editor(); return e ? e.alias : '' }
+
+// ─── HTTPヘルパー ──────────────────────────────────
+function sbHeaders(prefer) {
+  const h = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }
+  if (prefer) h['Prefer'] = prefer
+  return h
+}
+async function sbGet(path) {
+  const res = await fetch(SB_URL + '/rest/v1/' + path, { headers: sbHeaders() })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || JSON.stringify(data))
+  return data
+}
+async function sbPatch(filter, body) {
+  const res = await fetch(SB_URL + '/rest/v1/devices?' + filter, {
+    method:'PATCH', headers: sbHeaders('return=minimal'), body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(await res.text())
+}
+async function sbPost(table, body, prefer) {
+  const res = await fetch(SB_URL + '/rest/v1/' + table, {
+    method:'POST', headers: sbHeaders(prefer || 'return=minimal'), body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(await res.text())
 }
 
-window.openConfig = () => {
-  const c = cfg()
-  document.getElementById('cfgUrl').value   = c.url
-  document.getElementById('cfgKey').value   = c.key
-  document.getElementById('cfgSlack').value = c.slack
-  document.getElementById('cfgAlias').value = c.alias
-  new bootstrap.Modal(document.getElementById('configModal')).show()
-}
-
-window.saveConfig = async () => {
-  const url   = document.getElementById('cfgUrl').value.trim()
-  const key   = document.getElementById('cfgKey').value.trim()
-  const slack = document.getElementById('cfgSlack').value.trim()
-  const alias = document.getElementById('cfgAlias').value.trim()
-  if (!url || !key) { toast('URLとキーを入力してください', 'danger'); return }
-  localStorage.setItem('dej6_sb_url',   url)
-  localStorage.setItem('dej6_sb_key',   key)
-  localStorage.setItem('dej6_slack',    slack)
-  localStorage.setItem('dej6_alias',    alias)
-  bootstrap.Modal.getInstance(document.getElementById('configModal')).hide()
-  await initSB()
-}
-
-// ─── Firebase（SSP稼働状況）────────────────────────
-const FB_URL = 'https://ssp-rental-default-rtdb.asia-southeast1.firebasedatabase.app'
-let fbItems = {}
-
-async function loadFirebase() {
+// ─── データ読込 ────────────────────────────────────
+async function loadAll() {
+  setDbStatus('接続中...', 'warning')
   try {
-    const res = await fetch(`${FB_URL}/qr_items.json`)
-    if (res.ok) {
-      fbItems = (await res.json()) || {}
-    }
+    const [dev, cfg, fb] = await Promise.all([
+      sbGet('devices?select=*&order=device_id'),
+      sbGet('app_config?select=key,value').catch(()=>[]),
+      fetch(FB_URL + '/qr_items.json').then(r=>r.ok?r.json():{}).catch(()=>({})),
+    ])
+    allDevices = (Array.isArray(dev)?dev:[]).map(d => {
+      if (LEGACY[d.status]) d.status = LEGACY[d.status]
+      return d
+    })
+    appCfg = {}; (cfg||[]).forEach(r => appCfg[r.key] = r.value)
+    fbItems = fb || {}
+    setDbStatus('接続済み', 'success')
+    refreshUI()
   } catch(e) {
-    console.warn('Firebase読み込み失敗:', e)
+    setDbStatus('接続エラー', 'danger')
+    document.getElementById('deviceBody').innerHTML =
+      `<tr><td colspan="10" class="text-center py-4"><div class="alert alert-danger d-inline-block text-start">
+        <strong>データ読み込みエラー</strong><br><code>${esc(e.message)}</code><br>
+        <span class="small text-muted">Supabaseが一時停止中の可能性 → 数分後に再読み込みしてください</span><br><br>
+        <button class="btn btn-sm btn-danger" onclick="loadAll()">再試行</button></div></td></tr>`
   }
 }
+function cfgNum(key, def){ const v = parseInt(appCfg[key]); return isNaN(v) ? def : v }
+function refreshUI(){ updateSummary(); renderTasks(); renderTable(); renderBulkBar() }
 
+// ─── 共通ユーティリティ ─────────────────────────────
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
+function trunc(s,n){ s = s||''; return s.length>n ? s.slice(0,n)+'…' : s }
+function daysSince(d) {
+  const ts = d.status_changed_at || d.updated_at
+  if (!ts) return null
+  const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000)
+  return days >= 0 ? days : null
+}
+function daysBadge(d) {
+  if (d.status === '正常') return ''
+  const days = daysSince(d); if (days == null || days < 3) return ''
+  const stag = cfgNum('stagnation_days', 14)
+  const cls = days >= stag ? 'days-bad' : (days >= 7 ? 'days-warn' : '')
+  return cls ? `<span class="days-badge ${cls} ms-1">${days}日</span>` : ''
+}
 function fbBadge(deviceId) {
   if (!deviceId || !deviceId.startsWith('SSP-')) return ''
-  const key = deviceId.replace('SSP-', '').padStart(3, '0')
-  const fb = fbItems[key]
+  const fb = fbItems[deviceId.replace('SSP-','').padStart(3,'0')]
   if (!fb) return ''
-  if (fb.status === 'rented')    return `<span class="fb-rented ms-1" title="${fb.userName ? '担当: '+fb.userName : ''}">使用中</span>`
+  if (fb.status === 'rented')    return `<span class="fb-rented ms-1">使用中</span>`
   if (fb.status === 'broken')    return `<span class="fb-broken ms-1">故障登録</span>`
   if (fb.status === 'available') return `<span class="fb-available ms-1">空き</span>`
   return ''
 }
-
-// ─── Supabase REST ヘルパー ────────────────────────
-function sbHeaders() {
-  const c = cfg()
-  return {
-    'apikey':        c.key,
-    'Authorization': 'Bearer ' + c.key,
-    'Content-Type':  'application/json',
-    'Prefer':        'return=representation'
-  }
-}
-
-async function sbGet(path) {
-  const c = cfg()
-  const res = await fetch(c.url + '/rest/v1/' + path, { headers: sbHeaders() })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.message || data.hint || JSON.stringify(data))
-  return data
-}
-
-async function sbPatch(table, filter, body) {
-  const c = cfg()
-  const res = await fetch(`${c.url}/rest/v1/${table}?${filter}`, {
-    method: 'PATCH', headers: sbHeaders(), body: JSON.stringify(body)
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.message || data.hint || JSON.stringify(data))
-  return data
-}
-
-async function sbPost(table, body) {
-  const c = cfg()
-  const res = await fetch(`${c.url}/rest/v1/${table}`, {
-    method: 'POST', headers: sbHeaders(), body: JSON.stringify(body)
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.message || data.hint || JSON.stringify(data))
-  return data
-}
-
-async function initSB() {
-  const c = cfg()
-  setDbStatus('接続中...', 'warning')
-  if (!c.url || !c.key) { setDbStatus('未接続', 'secondary'); return }
-  try {
-    // Supabase と Firebase を並列取得
-    await Promise.all([loadDevices(), loadFirebase()])
-    setDbStatus('接続済み', 'success')
-    document.getElementById('slackAutoArea').style.display = c.slack ? 'inline' : 'none'
-    renderTable() // Firebase データ反映のため再描画
-  } catch(e) {
-    setDbStatus('エラー', 'danger')
-    toast('接続エラー: ' + e.message, 'danger')
-  }
-}
-
+function typeName(t){ return TYPE_LABEL[t] || t }
 function setDbStatus(txt, color) {
   const el = document.getElementById('dbStatus')
-  el.textContent = txt
-  el.className = `badge bg-${color}`
+  el.textContent = txt; el.className = `badge bg-${color}`
+}
+function toast(msg, type) {
+  const el = document.getElementById('appToast')
+  el.className = `toast align-items-center text-white border-0 bg-${type||'success'}`
+  document.getElementById('toastMsg').textContent = msg
+  bootstrap.Toast.getOrCreateInstance(el, {delay:4000}).show()
 }
 
-async function loadDevices() {
-  const c = cfg()
-  if (!c.url || !c.key) return
-  try {
-    const data = await sbGet('devices?select=*&order=device_id')
-    allDevices = Array.isArray(data) ? data : []
-    updateSummary(); renderTable()
-  } catch(e) {
-    console.error('loadDevices error:', e)
-    document.getElementById('deviceBody').innerHTML = `
-      <tr><td colspan="10" class="text-center py-4">
-        <div class="alert alert-danger d-inline-block text-start">
-          <strong>データ読み込みエラー</strong><br>
-          <code>${e.message}</code><br><br>
-          <button class="btn btn-sm btn-danger" onclick="initSB()">再試行</button>
-        </div>
-      </td></tr>`
-    throw e
+// ─── 編集モード認証 ─────────────────────────────────
+async function sha256(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('')
+}
+window.openLogin = () => {
+  document.getElementById('loginErr').classList.add('d-none')
+  new bootstrap.Modal(document.getElementById('loginModal')).show()
+}
+window.doLogin = async () => {
+  const alias = document.getElementById('loginAlias').value.trim().toLowerCase()
+  const pin   = document.getElementById('loginPin').value.trim()
+  if (!alias || !pin) return
+  const h = await sha256(PIN_SALT + pin)
+  if (h !== PIN_HASH) {
+    document.getElementById('loginErr').classList.remove('d-none'); return
   }
+  localStorage.setItem('dej6_editor_v2', JSON.stringify({alias, ok:true}))
+  bootstrap.Modal.getInstance(document.getElementById('loginModal'))?.hide()
+  toast(`ようこそ ${alias} さん(編集モード)`)
+  applyEditorUI(); refreshUI()
+}
+window.logout = () => {
+  localStorage.removeItem('dej6_editor_v2')
+  selection.clear()
+  applyEditorUI(); refreshUI()
+  toast('閲覧モードに戻りました', 'secondary')
+}
+function applyEditorUI() {
+  const ed = isEditor()
+  document.getElementById('loginBtn').classList.toggle('d-none', ed)
+  document.getElementById('logoutBtn').classList.toggle('d-none', !ed)
+  document.getElementById('configBtn').classList.toggle('d-none', !ed)
+  const badge = document.getElementById('editorBadge')
+  badge.classList.toggle('d-none', !ed)
+  if (ed) { badge.className = 'badge bg-warning text-dark'; badge.innerHTML = `<i class="bi bi-pencil-fill me-1"></i>${esc(myAlias())}` }
+  document.getElementById('thSelect').style.display = ed ? '' : 'none'
 }
 
+// ─── サマリー ──────────────────────────────────────
 function updateSummary() {
-  document.getElementById('cntTotal').textContent   = allDevices.length
-  document.getElementById('cntRepair').textContent  = allDevices.filter(d=>d.status==='修理中').length
-  document.getElementById('cntSim').textContent     = allDevices.filter(d=>d.status==='SIM起票済み').length
-  document.getElementById('cntZebra').textContent   = allDevices.filter(d=>d.status==='Zebra登録済み').length
-  document.getElementById('cntShipped').textContent = allDevices.filter(d=>d.status==='発送済み').length
+  const c = s => allDevices.filter(d=>d.status===s).length
+  document.getElementById('cntTotal').textContent    = allDevices.length
+  document.getElementById('cntWait').textContent     = c('修理待ち')
+  document.getElementById('cntSim').textContent      = c('SIM起票済み')
+  document.getElementById('cntRma').textContent      = c('RMA登録済み')
+  document.getElementById('cntShipped').textContent  = c('発送済み')
+  document.getElementById('cntReturned').textContent = c('返却済み')
 }
 
-// ─── テーブル描画 ──────────────────────────────────
-function renderTable() {
-  const q = document.getElementById('searchInput').value.toLowerCase()
-  const filtered = allDevices.filter(d => {
-    if (typeFilter !== 'ALL' && d.device_type !== typeFilter) return false
-    if (statusFilter !== 'ALL' && d.status !== statusFilter) return false
-    if (q) {
-      const hay = (d.device_id+d.serial_number+d.asset_number+d.memo).toLowerCase()
-      if (!hay.includes(q)) return false
-    }
-    return true
-  })
-  document.getElementById('countLabel').textContent = `${filtered.length} 件`
-  const tbody = document.getElementById('deviceBody')
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">該当なし</td></tr>`
-    return
+// ─── 今日やることパネル ──────────────────────────────
+function needsSIM(t){ return (FLOWS[t]||[]).includes('SIM起票済み') }
+function hasRMA(t){ return (FLOWS[t]||[]).includes('RMA登録済み') }
+function taskGroups() {
+  const g = { simWait:[], rmaWait:[], shipReady:[], shipped:[], setup:[], stagnant:[] }
+  const stag = cfgNum('stagnation_days', 14)
+  for (const d of allDevices) {
+    const s = d.status, t = d.device_type
+    if (s === '修理待ち' && needsSIM(t)) g.simWait.push(d)
+    if ((s === '修理待ち' && !needsSIM(t) && hasRMA(t)) || (s === 'SIM起票済み' && hasRMA(t))) g.rmaWait.push(d)
+    if (s === 'RMA登録済み' || (s === 'SIM起票済み' && !hasRMA(t))) g.shipReady.push(d)
+    if (s === '発送済み') g.shipped.push(d)
+    if (s === '返却済み') g.setup.push(d)
+    if (s !== '正常') { const days = daysSince(d); if (days != null && days >= stag) g.stagnant.push({d, days}) }
   }
-  tbody.innerHTML = filtered.map(d => `
-    <tr onclick="openStatus('${esc(d.device_id)}')" style="vertical-align:middle">
-      <td class="fw-semibold text-primary">${d.device_id}</td>
-      <td><span class="type-badge type-${d.device_type}">${d.device_type}</span></td>
-      <td class="small">${d.model||''}</td>
-      <td class="font-monospace small text-muted">${d.asset_number||''}</td>
-      <td class="font-monospace small">${d.serial_number||''}</td>
-      <td><span class="status-badge status-${d.status}">${d.status}</span>${fbBadge(d.device_id)}</td>
-      <td class="small">${d.ops_handler||d.it_handler||''}</td>
-      <td class="font-monospace small text-info">${d.zebra_rma||''}</td>
-      <td class="small text-muted">${trunc(d.memo||'',30)}</td>
-      <td>
-        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem" title="履歴"
-          onclick="event.stopPropagation();openHistory('${esc(d.device_id)}')">
-          <i class="bi bi-clock-history"></i>
-        </button>
-      </td>
-    </tr>`).join('')
+  return g
+}
+function typeSummary(arr) {
+  const m = {}; arr.forEach(d => m[d.device_type] = (m[d.device_type]||0)+1)
+  return Object.entries(m).map(([t,n])=>`${typeName(t)}×${n}`).join(' ')
+}
+function renderTasks() {
+  const g = taskGroups(), ed = isEditor()
+  const items = []
+  if (g.simWait.length) items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2">
+    <span>🔴 <strong>SIM起票待ち: ${g.simWait.length}台</strong> <span class="text-secondary small">${typeSummary(g.simWait)}</span></span>
+    ${ed?`<button class="btn btn-warning btn-sm ms-auto" onclick="taskAction('sim')"><i class="bi bi-ticket-perforated me-1"></i>SIM本文を生成</button>`:''}</div>`)
+  if (g.rmaWait.length) items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2">
+    <span>🟡 <strong>Zebra RMA登録待ち: ${g.rmaWait.length}台</strong> <span class="text-secondary small">${typeSummary(g.rmaWait)}</span></span>
+    ${ed?`<button class="btn btn-info btn-sm ms-auto" onclick="taskAction('rma')"><i class="bi bi-table me-1"></i>登録用データ生成</button>`:''}</div>`)
+  if (g.shipReady.length) items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2">
+    <span>🟠 <strong>発送準備OK: ${g.shipReady.length}台</strong> <span class="text-secondary small">${typeSummary(g.shipReady)}</span></span>
+    ${ed?`<button class="btn btn-light btn-sm ms-auto" onclick="taskAction('ship')"><i class="bi bi-printer me-1"></i>発送処理へ</button>`:''}</div>`)
+  if (g.shipped.length) items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2">
+    <span>🟣 発送中(返却待ち): ${g.shipped.length}台 <span class="text-secondary small">${typeSummary(g.shipped)}</span></span></div>`)
+  if (g.setup.length) items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2">
+    <span>🔵 <strong>返却済み・要設定: ${g.setup.length}台</strong> <span class="text-secondary small">${g.setup.map(d=>d.device_id).slice(0,8).join(' ')}</span></span>
+    ${ed?`<button class="btn btn-success btn-sm ms-auto" onclick="taskAction('setup')">設定完了処理へ</button>`:''}</div>`)
+  if (g.stagnant.length) {
+    const worst = g.stagnant.sort((a,b)=>b.days-a.days).slice(0,5)
+    items.push(`<div class="task-item"><span>⚠ <strong>滞留アラート:</strong> <span class="small">${worst.map(x=>`${x.d.device_id}(${esc(x.d.status)} ${x.days}日)`).join(', ')}${g.stagnant.length>5?` ほか${g.stagnant.length-5}台`:''}</span></span></div>`)
+  }
+  if (!items.length) items.push(`<div class="task-item">✅ 修理パイプラインは空です。全機器正常。</div>`)
+  if (!ed && (g.simWait.length||g.rmaWait.length||g.shipReady.length||g.setup.length))
+    items.push(`<div class="readonly-note text-secondary">※操作するには右上「編集モード」でログイン</div>`)
+  document.getElementById('taskList').innerHTML = items.join('')
+  document.getElementById('taskUpdated').textContent = 'qr-app連携: 30分毎自動同期'
+}
+// タスクパネルのボタン → 対象を自動選択して一括モーダルへ
+window.taskAction = kind => {
+  const g = taskGroups()
+  selection.clear()
+  if (kind === 'sim')   { g.simWait.forEach(d=>selection.add(d.device_id));  openBulk('SIM起票済み') }
+  if (kind === 'rma')   { g.rmaWait.forEach(d=>selection.add(d.device_id));  openBulk('RMA登録済み') }
+  if (kind === 'ship')  { g.shipReady.forEach(d=>selection.add(d.device_id)); openBulk('発送済み') }
+  if (kind === 'setup') { g.setup.forEach(d=>selection.add(d.device_id));    openBulk('正常') }
+  renderTable(); renderBulkBar()
 }
 
-function trunc(s,n){ return s.length>n ? s.slice(0,n)+'…' : s }
-function esc(s){ return (s||'').replace(/'/g,"&#39;") }
-
+// ─── フィルター/テーブル ─────────────────────────────
 window.setTypeFilter = el => {
   document.querySelectorAll('#typeFilters .filter-chip').forEach(e=>e.classList.remove('active'))
   el.classList.add('active'); typeFilter = el.dataset.type; renderTable()
@@ -915,40 +664,115 @@ window.setStatusFilter = el => {
   document.querySelectorAll('#statusFilters .filter-chip').forEach(e=>e.classList.remove('active'))
   el.classList.add('active'); statusFilter = el.dataset.status; renderTable()
 }
+window.setStatusChip = status => {
+  document.querySelectorAll('#statusFilters .filter-chip').forEach(e=>{
+    e.classList.toggle('active', e.dataset.status === status)
+  })
+  statusFilter = status; renderTable()
+}
+function filteredDevices() {
+  const q = document.getElementById('searchInput').value.toLowerCase()
+  return allDevices.filter(d => {
+    if (typeFilter !== 'ALL' && d.device_type !== typeFilter) return false
+    if (statusFilter !== 'ALL' && d.status !== statusFilter) return false
+    if (q) {
+      const hay = [d.device_id,d.serial_number,d.asset_number,d.memo,d.ops_handler,d.zebra_rma].join(' ').toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  })
+}
+function renderTable() {
+  const ed = isEditor()
+  const filtered = filteredDevices()
+  document.getElementById('countLabel').textContent = `${filtered.length} 件`
+  const tbody = document.getElementById('deviceBody')
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">該当なし</td></tr>`
+    return
+  }
+  tbody.innerHTML = filtered.map(d => `
+    <tr onclick="openStatus('${esc(d.device_id)}')" style="vertical-align:middle">
+      ${ed?`<td onclick="event.stopPropagation()"><input type="checkbox" class="select-cb" ${selection.has(d.device_id)?'checked':''}
+        onchange="toggleSelect('${esc(d.device_id)}', this.checked)"></td>`:''}
+      <td class="fw-semibold text-primary">${esc(d.device_id)}</td>
+      <td><span class="type-badge type-${esc(d.device_type)}">${typeName(d.device_type)}</span></td>
+      <td><span class="status-badge status-${esc(d.status)}">${d.status==='返却済み'?'返却済み・要設定':esc(d.status)}</span>${fbBadge(d.device_id)}${daysBadge(d)}</td>
+      <td class="font-monospace small hide-sm">${esc(d.serial_number)}</td>
+      <td class="font-monospace small text-muted hide-sm">${esc(d.asset_number)}</td>
+      <td class="small">${esc(d.ops_handler||d.it_handler||'')}</td>
+      <td class="font-monospace small text-info hide-sm">${esc(d.zebra_rma)}</td>
+      <td class="small text-muted hide-sm">${esc(trunc(d.memo,25))}</td>
+      <td><button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem" title="履歴"
+        onclick="event.stopPropagation();openHistory('${esc(d.device_id)}')"><i class="bi bi-clock-history"></i></button></td>
+    </tr>`).join('')
+  // ヘッダのcolspan調整
+  document.getElementById('thSelect').style.display = ed ? '' : 'none'
+}
 document.getElementById('searchInput').addEventListener('input', renderTable)
 
-// ─── ステータス更新 ────────────────────────────────
+// ─── 選択/一括バー ──────────────────────────────────
+window.toggleSelect = (id, on) => {
+  if (on) selection.add(id); else selection.delete(id)
+  renderBulkBar()
+}
+window.toggleAll = cb => {
+  filteredDevices().forEach(d => cb.checked ? selection.add(d.device_id) : selection.delete(d.device_id))
+  renderTable(); renderBulkBar()
+}
+window.clearSelection = () => { selection.clear(); renderTable(); renderBulkBar() }
+function renderBulkBar() {
+  const bar = document.getElementById('bulkBar')
+  if (!isEditor() || selection.size === 0) { bar.style.display = 'none'; return }
+  bar.style.display = 'block'
+  document.getElementById('bulkCount').textContent = selection.size
+  const devs = allDevices.filter(d => selection.has(d.device_id))
+  // 選択中の機器で共通に遷移可能なステータス
+  const candidates = ['修理待ち','SIM起票済み','RMA登録済み','発送済み','返却済み','正常']
+  const possible = candidates.filter(s => devs.every(d => s==='正常' || s==='修理待ち' || (FLOWS[d.device_type]||[]).includes(s)))
+  document.getElementById('bulkActions').innerHTML = possible.map(s =>
+    `<button class="btn btn-sm btn-outline-light" onclick="openBulk('${s}')"><span class="status-badge status-${s}">${s}</span> へ</button>`).join('')
+}
+
+// ─── 単体ステータス更新モーダル ───────────────────────
 window.openStatus = id => {
   currentDevice = allDevices.find(d => d.device_id === id)
   if (!currentDevice) return
   const d = currentDevice
   selectedStatus = null
   document.getElementById('mDeviceId').textContent = d.device_id
-  document.getElementById('mType').innerHTML = `<span class="type-badge type-${d.device_type}">${d.device_type}</span>`
-  document.getElementById('mModel').textContent = d.model||''
-  document.getElementById('mSerialInput').value = d.serial_number||''
-  document.getElementById('mAssetInput').value = d.asset_number||''
-  document.getElementById('mMemoInput').value = d.memo||''
-  document.getElementById('mCurrentStatus').innerHTML = `<span class="status-badge status-${d.status}">${d.status}</span>`
+  document.getElementById('mType').innerHTML = `<span class="type-badge type-${esc(d.device_type)}">${typeName(d.device_type)}</span>`
+  document.getElementById('mModel').textContent = d.model || ''
+  document.getElementById('mSerialInput').value = d.serial_number || ''
+  document.getElementById('mAssetInput').value = d.asset_number || ''
+  document.getElementById('mMemoInput').value = d.memo || ''
+  document.getElementById('mCurrentStatus').innerHTML = `<span class="status-badge status-${esc(d.status)}">${esc(d.status)}</span>${fbBadge(d.device_id)}`
+  const days = daysSince(d)
+  document.getElementById('mDays').innerHTML = (d.status!=='正常' && days!=null) ? `<span class="small">${days}日</span>` : '<span class="text-muted small">—</span>'
   document.getElementById('dynamicForm').innerHTML = ''
   document.getElementById('slackPreviewArea').style.display = 'none'
   document.getElementById('selectedStatusBadge').style.display = 'none'
   document.getElementById('saveBtn').disabled = true
+  // 閲覧モードは読み取り専用
+  const ed = isEditor()
+  ;['mSerialInput','mAssetInput','mMemoInput'].forEach(i=>document.getElementById(i).disabled = !ed)
+  document.getElementById('saveBtn').style.display = ed ? '' : 'none'
+  // フロー順のステータスボタン
+  const flow = (FLOWS[d.device_type] || ['修理待ち','SIM起票済み','発送済み','返却済み','正常'])
+  document.getElementById('statusBtns').innerHTML = ed
+    ? flow.map(s => `<button class="btn btn-sm ${s===d.status?'btn-secondary disabled':'btn-outline-dark'}"
+        onclick="selectStatus('${s}')"><span class="status-badge status-${s}">${s}</span></button>`).join('')
+    : `<span class="text-muted small">閲覧モードのため変更不可。右上「編集モード」からログインしてください。</span>`
   new bootstrap.Modal(document.getElementById('statusModal')).show()
 }
-
-// シリアル/アセットが編集されたら（ステータス未選択でも）保存可能にする
 window.checkDirty = () => {
-  const d = currentDevice
-  if (!d) return
-  const serialChanged = document.getElementById('mSerialInput').value.trim() !== (d.serial_number||'')
-  const assetChanged  = document.getElementById('mAssetInput').value.trim()  !== (d.asset_number||'')
-  const memoChanged   = document.getElementById('mMemoInput').value.trim()   !== (d.memo||'')
-  if (selectedStatus || serialChanged || assetChanged || memoChanged) {
-    document.getElementById('saveBtn').disabled = false
-  }
+  const d = currentDevice; if (!d || !isEditor()) return
+  const dirty = selectedStatus
+    || document.getElementById('mSerialInput').value.trim() !== (d.serial_number||'')
+    || document.getElementById('mAssetInput').value.trim()  !== (d.asset_number||'')
+    || document.getElementById('mMemoInput').value.trim()   !== (d.memo||'')
+  if (dirty) document.getElementById('saveBtn').disabled = false
 }
-
 window.selectStatus = status => {
   selectedStatus = status
   document.getElementById('saveBtn').disabled = false
@@ -956,348 +780,413 @@ window.selectStatus = status => {
   document.getElementById('selStatusLabel').innerHTML = `<span class="status-badge status-${status}">${status}</span>`
   buildForm(status)
 }
-
+function simGuide(t) {
+  const url = SIM_TEMPLATES[t]
+  if (t === 'Avery') return `<div class="alert alert-warning py-2 small">Averyの物理故障はチケット不要。<a href="https://w.amazon.com/bin/view/JP-OTS/AMZL-EF-Function/QuickLink/AMZL/" target="_blank">Avery修理依頼方法(Wiki)</a>でTrouble Shootingと修理依頼をしてください。</div>`
+  if (!url) return `<div class="alert alert-light border py-2 small"><a href="https://w.amazon.com/bin/view/JP-OTS/AMZL-EF-Function/QuickLink/AMZL/" target="_blank">JP-OTS QuickLink(Wiki)</a>から該当機器のSIMテンプレートを開いてください。</div>`
+  return `<div class="alert alert-info py-2 small"><a href="${url}" target="_blank">${typeName(t)} SIMテンプレートを開く →</a></div>`
+}
 function buildForm(status) {
-  const d = currentDevice, alias = cfg().alias
-  let html = ''
+  const d = currentDevice, alias = myAlias()
   const today = new Date().toISOString().slice(0,10)
-
-  if (status === '修理中') {
+  let html = ''
+  if (status === '修理待ち') {
     html = `<div class="row g-2">
-      <div class="col-md-5">
-        <label class="form-label fw-semibold">不具合カテゴリー</label>
-        <select class="form-select" id="fDefCat">
-          <option value="">選択してください</option>
-          ${DEFECT_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">担当者</label>
-        <input type="text" class="form-control" id="fHandler" value="${alias}">
-      </div>
-      <div class="col-12">
-        <label class="form-label fw-semibold">不具合詳細</label>
-        <textarea class="form-control" id="fDefDetail" rows="2" placeholder="症状の詳細...">${d.defect_detail||''}</textarea>
-      </div>
-      <div class="col-12">
-        <label class="form-label">SIM URL（任意）</label>
-        <input type="url" class="form-control" id="fSimUrl" value="${d.sim_url||''}" placeholder="https://t.corp.amazon.com/...">
-      </div>
+      <div class="col-md-5"><label class="form-label fw-semibold">不具合カテゴリー</label>
+        <select class="form-select" id="fDefCat"><option value="">選択してください</option>
+        ${DEFECT_CATS.map(c=>`<option ${d.defect_category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="col-md-4"><label class="form-label fw-semibold">担当者</label>
+        <input type="text" class="form-control" id="fHandler" value="${esc(alias)}"></div>
+      <div class="col-12"><label class="form-label fw-semibold">不具合詳細</label>
+        <textarea class="form-control" id="fDefDetail" rows="2" placeholder="症状の詳細...">${esc(d.defect_detail)}</textarea></div>
     </div>`
-
   } else if (status === 'SIM起票済み') {
-    const isFS  = d.device_type === 'FS'
-    const isZD  = d.device_type === 'ZD611'
-    const simLink = isZD
-      ? 'https://t.corp.amazon.com/create/templates/e75944fb-e00d-4557-9b91-795d48c49129'
-      : 'https://t.corp.amazon.com/create/templates/c0bfd429-2e74-4998-ad75-c1d06b6e4092'
-    const simLabel = isZD ? 'ZD611 SIMテンプレートを開く →' : 'SSP/TC57 SIMテンプレートを開く →'
-    html = isFS
-      ? `<div class="alert alert-warning py-2 small">
-          <i class="bi bi-exclamation-triangle me-1"></i>
-          <strong>FSのSIM起票は不要です。</strong>Zebraポータルから直接修理依頼を行ってください。<br>
-          FSは「Zebra登録済み」に進んでください。
-        </div>
-        <div class="row g-2">
-          <div class="col-md-4">
-            <label class="form-label">担当者</label>
-            <input type="text" class="form-control" id="fHandler" value="${alias}">
-          </div>
-        </div>`
-      : `<div class="alert alert-info py-2 small">
-          <i class="bi bi-info-circle me-1"></i>
-          SIMを起票後、起票したチケットのURLを入力してください。<br>
-          <a href="${simLink}" target="_blank">${simLabel}</a>
-        </div>
-        <div class="row g-2">
-          <div class="col-12">
-            <label class="form-label fw-bold">SIM URL <span class="text-danger">*</span></label>
-            <input type="url" class="form-control" id="fSimUrl" value="${d.sim_url||''}"
-              placeholder="https://t.corp.amazon.com/P123456789">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">担当者</label>
-            <input type="text" class="form-control" id="fHandler" value="${alias}">
-          </div>
-          <div class="col-12">
-            <label class="form-label">不具合詳細（SIM記載内容）</label>
-            <textarea class="form-control" id="fDefDetail" rows="2"
-              placeholder="SIMに記載した内容をここにも記録...">${d.defect_detail||''}</textarea>
-          </div>
-        </div>`
-
-  } else if (status === 'Zebra登録済み') {
-    html = `<div class="alert alert-info py-2 small">
-      <i class="bi bi-info-circle me-1"></i>
-      Zebraポータルに登録後、RMA番号を入力してください。<br>
-      <a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login" target="_blank">Zebra修理ポータル →</a>
-      &nbsp;|&nbsp; アカウント: dej6-amzl-rma@amazon.com
-      <div class="mt-1"><strong>⚠️ 備考欄に「スワップ禁止」と必ず記入すること</strong></div>
-    </div>
+    html = `${simGuide(d.device_type)}
     <div class="row g-2">
-      <div class="col-md-5">
-        <label class="form-label fw-bold">Zebra RMA番号 <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="fRma" placeholder="例: 12345678" value="${d.zebra_rma||''}">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">担当者</label>
-        <input type="text" class="form-control" id="fHandler" value="${alias}">
-      </div>
+      <div class="col-12"><label class="form-label fw-bold">SIM URL <span class="text-danger">*</span></label>
+        <input type="url" class="form-control" id="fSimUrl" value="${esc(d.sim_url)}" placeholder="https://t.corp.amazon.com/P123456789"></div>
+      <div class="col-md-4"><label class="form-label">担当者</label>
+        <input type="text" class="form-control" id="fHandler" value="${esc(alias)}"></div>
     </div>`
-
+  } else if (status === 'RMA登録済み') {
+    html = `<div class="alert alert-info py-2 small">
+      <a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login" target="_blank">Zebra修理ポータル →</a>
+      &nbsp;| アカウント: dej6-amzl-rma@amazon.com
+      <div class="mt-1"><strong>⚠️ 備考欄に「スワップ禁止」と必ず記入</strong></div></div>
+    <div class="row g-2">
+      <div class="col-md-5"><label class="form-label fw-bold">Zebra RMA番号 <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="fRma" value="${esc(d.zebra_rma)}" placeholder="例: 12345678"></div>
+      <div class="col-md-4"><label class="form-label">担当者</label>
+        <input type="text" class="form-control" id="fHandler" value="${esc(alias)}"></div>
+    </div>`
   } else if (status === '発送済み') {
-    html = `<div class="row g-2">
-      <div class="col-md-4">
-        <label class="form-label fw-bold">発送日 <span class="text-danger">*</span></label>
-        <input type="date" class="form-control" id="fShipDate" value="${today}" oninput="updatePreview()">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">伝票番号（ヤマト）</label>
-        <input type="text" class="form-control" id="fTracking" value="${d.tracking_number||''}" placeholder="1234-5678-9012" oninput="updatePreview()">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">担当者</label>
-        <input type="text" class="form-control" id="fHandler" value="${alias}" oninput="updatePreview()">
-      </div>
-      <div class="col-md-5">
-        <label class="form-label">Zebra RMA番号</label>
-        <input type="text" class="form-control" id="fRma" value="${d.zebra_rma||''}" oninput="updatePreview()">
-      </div>
+    const dest = ZEBRA_TYPES.includes(d.device_type) ? 'Zebra社(Direct RMA)' : 'TYO4 青梅FC IT宛'
+    html = `<div class="alert alert-warning py-2 small"><strong>発送先: ${dest}</strong> — Shipping Manifestを必ず同梱。膨張バッテリーは発送禁止(サイト内廃棄)。</div>
+    <div class="row g-2">
+      <div class="col-md-4"><label class="form-label fw-bold">発送日 <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" id="fShipDate" value="${today}" oninput="updatePreview()"></div>
+      <div class="col-md-4"><label class="form-label">伝票番号(ヤマト)</label>
+        <input type="text" class="form-control" id="fTracking" value="${esc(d.tracking_number)}" placeholder="1234-5678-9012" oninput="updatePreview()"></div>
+      <div class="col-md-4"><label class="form-label">担当者</label>
+        <input type="text" class="form-control" id="fHandler" value="${esc(alias)}" oninput="updatePreview()"></div>
+      <div class="col-md-5"><label class="form-label">RMA番号</label>
+        <input type="text" class="form-control" id="fRma" value="${esc(d.zebra_rma)}" oninput="updatePreview()"></div>
+      <div class="col-12"><button class="btn btn-outline-primary btn-sm" onclick="printManifest([currentDevice])"><i class="bi bi-printer me-1"></i>Shipping Manifest印刷</button></div>
     </div>`
-    setTimeout(() => {
-      document.getElementById('slackPreviewArea').style.display = 'block'
-      updatePreview()
-      document.getElementById('slackNote').textContent = cfg().slack ? '自動送信可能' : 'Webhook未設定 → コピー方式'
-    }, 30)
-
-  } else if (status === '修理完了') {
+    setTimeout(() => { document.getElementById('slackPreviewArea').style.display = 'block'; updatePreview()
+      document.getElementById('slackNote').textContent = 'コピーして #dej6-it-poc へ' }, 30)
+  } else if (status === '返却済み') {
     html = `<div class="row g-2">
-      <div class="col-md-4">
-        <label class="form-label">返却日</label>
-        <input type="date" class="form-control" id="fRetDate" value="${today}">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">担当者</label>
-        <input type="text" class="form-control" id="fHandler" value="${alias}">
-      </div>
-      <div class="col-12">
-        <label class="form-label">備考</label>
-        <textarea class="form-control" id="fNote" rows="2" placeholder="例: 基板交換で返却 / 交換品"></textarea>
-      </div>
-    </div>`
-    setTimeout(() => {
-      document.getElementById('slackPreviewArea').style.display = 'block'
-      document.getElementById('slackPreview').textContent = buildSlackMsg('修理完了')
-      document.getElementById('slackNote').textContent = cfg().slack ? '自動送信可能' : 'Webhook未設定 → コピー方式'
-    }, 30)
-
-  } else if (status === '正常') {
-    html = `<div class="alert alert-success py-2">
-      <i class="bi bi-check-circle me-1"></i>このデバイスを<strong>正常</strong>に戻します。修理完了・設定済みの機器を現場に戻す際に使用。
+      <div class="col-md-4"><label class="form-label">返却日</label>
+        <input type="date" class="form-control" id="fRetDate" value="${today}"></div>
+      <div class="col-md-4"><label class="form-label">担当者</label>
+        <input type="text" class="form-control" id="fHandler" value="${esc(alias)}"></div>
+      <div class="col-12"><label class="form-label">備考</label>
+        <textarea class="form-control" id="fNote" rows="2" placeholder="例: 基板交換で返却 / 交換品"></textarea></div>
     </div>
-    <div class="col-md-4">
-      <label class="form-label">担当者</label>
-      <input type="text" class="form-control" id="fHandler" value="${alias}">
-    </div>`
+    <div class="alert alert-info py-2 small mt-2">受取後、ナンバリング・設定を行い「正常」に戻してください。</div>`
+    setTimeout(() => { document.getElementById('slackPreviewArea').style.display = 'block'
+      document.getElementById('slackPreview').textContent = buildSlackMsg('返却済み')
+      document.getElementById('slackNote').textContent = 'コピーして #dej6-it-poc へ' }, 30)
+  } else if (status === '正常') {
+    html = `<div class="alert alert-success py-2"><i class="bi bi-check-circle me-1"></i>設定完了・現場復帰。修理関連データ(RMA/不具合/伝票)はクリアされます。</div>
+    <div class="col-md-4"><label class="form-label">担当者</label>
+      <input type="text" class="form-control" id="fHandler" value="${esc(alias)}"></div>`
   }
-
   document.getElementById('dynamicForm').innerHTML = html
 }
-
 function buildSlackMsg(status) {
   if (!currentDevice) return ''
   const d = currentDevice
   const today = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})
-  const handler  = document.getElementById('fHandler')?.value || cfg().alias
+  const handler  = document.getElementById('fHandler')?.value || myAlias()
   const rma      = document.getElementById('fRma')?.value || d.zebra_rma || ''
   const tracking = document.getElementById('fTracking')?.value || ''
   const defect   = d.defect_detail || d.defect_category || ''
-
-  if (status === '発送済み') {
-    return [
-      `【${d.device_id}】発送済み ✈️`,
-      `種別: ${d.device_type}  モデル: ${d.model}`,
-      `シリアル: ${d.serial_number}`,
-      rma      ? `Zebra RMA: ${rma}` : null,
-      defect   ? `不具合: ${defect}` : null,
-      `発送日: ${today}`,
-      tracking ? `伝票番号: ${tracking}（ヤマト発払）` : null,
-      `担当: ${handler}`,
-    ].filter(Boolean).join('\n')
-  }
-  if (status === '修理完了') {
-    return [
-      `【${d.device_id}】修理完了・返却 ✅`,
-      `種別: ${d.device_type}  モデル: ${d.model}`,
-      `シリアル: ${d.serial_number}`,
-      rma    ? `Zebra RMA: ${rma}` : null,
-      `返却日: ${today}`,
-      `担当: ${handler}`,
-    ].filter(Boolean).join('\n')
-  }
+  if (status === '発送済み') return [
+    `【${d.device_id}】発送済み ✈️`,
+    `種別: ${typeName(d.device_type)}  モデル: ${d.model||''}`,
+    `シリアル: ${d.serial_number||''}`,
+    rma ? `RMA: ${rma}` : null,
+    defect ? `不具合: ${defect}` : null,
+    `発送日: ${today}`,
+    tracking ? `伝票番号: ${tracking}(ヤマト発払)` : null,
+    `担当: ${handler}`].filter(Boolean).join('\n')
+  if (status === '返却済み') return [
+    `【${d.device_id}】修理返却・受領 ✅`,
+    `種別: ${typeName(d.device_type)}  モデル: ${d.model||''}`,
+    `シリアル: ${d.serial_number||''}`,
+    rma ? `RMA: ${rma}` : null,
+    `返却日: ${today}`,
+    `担当: ${handler}  → 設定後に正常へ戻します`].filter(Boolean).join('\n')
   return ''
 }
-
 window.updatePreview = () => {
   document.getElementById('slackPreview').textContent = buildSlackMsg(selectedStatus)
 }
-
 window.copySlack = () => {
-  const msg = document.getElementById('slackPreview').textContent
-  navigator.clipboard.writeText(msg).then(() => {
-    toast('コピーしました！ #dej6-it-poc に貼り付けてください 📋', 'success')
-  })
+  navigator.clipboard.writeText(document.getElementById('slackPreview').textContent)
+    .then(()=>toast('コピーしました。#dej6-it-poc に貼り付けてください 📋'))
 }
 
-window.sendSlack = async () => {
-  const hook = cfg().slack
-  if (!hook) return
-  const msg = document.getElementById('slackPreview').textContent
-  try {
-    await fetch(hook, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text: msg }) })
-    toast('Slackに送信しました！', 'success')
-  } catch(e) {
-    toast('Slack送信エラー: ' + e.message, 'danger')
+// ─── 単体保存 ──────────────────────────────────────
+function statusPatch(d, newStatus, fields) {
+  const upd = { status: newStatus, status_changed_at: new Date().toISOString() }
+  if (fields.handler) upd.ops_handler = fields.handler
+  if (newStatus === '修理待ち') {
+    upd.fault_source = 'manual'
+    if (fields.defCat)    upd.defect_category = fields.defCat
+    if (fields.defDetail) upd.defect_detail   = fields.defDetail
+  } else if (newStatus === 'SIM起票済み') {
+    if (fields.simUrl) upd.sim_url = fields.simUrl
+  } else if (newStatus === 'RMA登録済み') {
+    if (fields.rma) upd.zebra_rma = fields.rma
+  } else if (newStatus === '発送済み') {
+    if (fields.shipDate) upd.shipping_date   = fields.shipDate
+    if (fields.tracking) upd.tracking_number = fields.tracking
+    if (fields.rma)      upd.zebra_rma       = fields.rma
+  } else if (newStatus === '返却済み') {
+    if (fields.retDate) upd.return_date = fields.retDate
+  } else if (newStatus === '正常') {
+    Object.assign(upd, { fault_source:null, zebra_rma:null, defect_category:null,
+      defect_detail:null, shipping_date:null, tracking_number:null, return_date:null })
   }
+  return upd
 }
-
-// ─── 保存 ────────────────────────────────────────
 window.saveStatus = async () => {
   if (!currentDevice) return
-  const c = cfg()
-  if (!c.url || !c.key) { toast('Supabase未接続です', 'danger'); return }
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
   const d = currentDevice
-  const handler = document.getElementById('fHandler')?.value || ''
-
-  // シリアル/アセットの変更を検出
+  const handler = document.getElementById('fHandler')?.value || myAlias()
   const newSerial = document.getElementById('mSerialInput').value.trim()
   const newAsset  = document.getElementById('mAssetInput').value.trim()
   const newMemo   = document.getElementById('mMemoInput').value.trim()
-  const serialChanged = newSerial !== (d.serial_number||'')
-  const assetChanged  = newAsset  !== (d.asset_number||'')
-  const memoChanged   = newMemo   !== (d.memo||'')
-
-  if (!selectedStatus && !serialChanged && !assetChanged && !memoChanged) {
-    toast('変更がありません', 'warning'); return
-  }
-
   const upd = {}
-  // シリアル/アセットは常に反映（変更があれば）
-  if (serialChanged) upd.serial_number = newSerial
-  if (assetChanged)  upd.asset_number  = newAsset
-  if (memoChanged)   upd.memo          = newMemo
-
-  // ステータス選択時のみステータス関連を反映
+  if (newSerial !== (d.serial_number||'')) upd.serial_number = newSerial
+  if (newAsset  !== (d.asset_number||''))  upd.asset_number  = newAsset
+  if (newMemo   !== (d.memo||''))          upd.memo          = newMemo
   if (selectedStatus) {
-    upd.status = selectedStatus
-    if (handler) upd.ops_handler = handler
-  }
-
-  if (selectedStatus === '修理中') {
-    const cat    = document.getElementById('fDefCat')?.value    || ''
-    const detail = document.getElementById('fDefDetail')?.value || ''
-    const sim    = document.getElementById('fSimUrl')?.value    || ''
-    if (cat)    upd.defect_category = cat
-    if (detail) upd.defect_detail   = detail
-    if (sim)    upd.sim_url         = sim
-  } else if (selectedStatus === 'SIM起票済み') {
-    const sim    = document.getElementById('fSimUrl')?.value    || ''
-    const detail = document.getElementById('fDefDetail')?.value || ''
-    if (sim)    upd.sim_url       = sim
-    if (detail) upd.defect_detail = detail
-  } else if (selectedStatus === 'Zebra登録済み') {
-    const rma = document.getElementById('fRma')?.value || ''
-    if (rma) upd.zebra_rma = rma
-  } else if (selectedStatus === '発送済み') {
-    const ship = document.getElementById('fShipDate')?.value || ''
-    const trk  = document.getElementById('fTracking')?.value  || ''
-    const rma  = document.getElementById('fRma')?.value       || ''
-    if (ship) upd.shipping_date    = ship
-    if (trk)  upd.tracking_number = trk
-    if (rma)  upd.zebra_rma       = rma
-  } else if (selectedStatus === '修理完了') {
-    const ret = document.getElementById('fRetDate')?.value || ''
-    if (ret) upd.return_date = ret
-  } else if (selectedStatus === '正常') {
-    Object.assign(upd, { zebra_rma:null, defect_category:null, defect_detail:null,
-      shipping_date:null, tracking_number:null, return_date:null })
-  }
-
-  try {
-    await sbPatch('devices', `device_id=eq.${encodeURIComponent(d.device_id)}`, upd)
-    // ステータス変更時のみ履歴を記録
-    if (selectedStatus) {
-      await sbPost('repair_history', {
-        device_id:        d.device_id,
-        from_status:      d.status,
-        to_status:        selectedStatus,
-        handler:          handler,
-        note:             document.getElementById('fNote')?.value || upd.defect_detail || '',
-        zebra_rma:        upd.zebra_rma || d.zebra_rma || null,
-        tracking_number:  upd.tracking_number || null,
-      })
+    if (selectedStatus === 'SIM起票済み' && !(document.getElementById('fSimUrl')?.value||'').trim() && d.device_type !== 'Avery') {
+      toast('SIM URLを入力してください', 'danger'); return
     }
-    bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide()
-    const editMsg = []
-    if (selectedStatus) editMsg.push(`→ ${selectedStatus}`)
-    if (serialChanged)  editMsg.push('シリアル番号')
-    if (assetChanged)   editMsg.push('アセット番号')
-    if (memoChanged)    editMsg.push('メモ')
-    toast(`${d.device_id} ${editMsg.join(' / ')} を更新しました`, 'success')
-    await loadDevices()
-  } catch(e) {
-    toast('保存エラー: ' + e.message, 'danger')
+    if (selectedStatus === 'RMA登録済み' && !(document.getElementById('fRma')?.value||'').trim()) {
+      toast('RMA番号を入力してください', 'danger'); return
+    }
+    Object.assign(upd, statusPatch(d, selectedStatus, {
+      handler,
+      defCat:    document.getElementById('fDefCat')?.value,
+      defDetail: document.getElementById('fDefDetail')?.value,
+      simUrl:    document.getElementById('fSimUrl')?.value,
+      rma:       document.getElementById('fRma')?.value,
+      shipDate:  document.getElementById('fShipDate')?.value,
+      tracking:  document.getElementById('fTracking')?.value,
+      retDate:   document.getElementById('fRetDate')?.value,
+    }))
   }
+  if (!Object.keys(upd).length) { toast('変更がありません', 'warning'); return }
+  try {
+    await sbPatch(`device_id=eq.${encodeURIComponent(d.device_id)}`, upd)
+    if (selectedStatus) {
+      await sbPost('repair_history', { device_id: d.device_id, from_status: d.status,
+        to_status: selectedStatus, handler,
+        note: document.getElementById('fNote')?.value || upd.defect_detail || '',
+        zebra_rma: upd.zebra_rma || d.zebra_rma || null,
+        tracking_number: upd.tracking_number || null })
+    }
+    bootstrap.Modal.getInstance(document.getElementById('statusModal'))?.hide()
+    toast(`${d.device_id} を更新しました`)
+    await loadAll()
+  } catch(e) { toast('保存エラー: ' + e.message, 'danger') }
 }
 
-// ─── 履歴 ────────────────────────────────────────
+// ─── 一括操作 ──────────────────────────────────────
+window.openBulk = target => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  bulkTarget = target
+  bulkDevices = allDevices.filter(d => selection.has(d.device_id))
+    .filter(d => target==='正常' || target==='修理待ち' || (FLOWS[d.device_type]||[]).includes(target))
+  if (!bulkDevices.length) { toast('対象機器がありません', 'warning'); return }
+  document.getElementById('bulkModalTitle').innerHTML = `<span class="status-badge status-${target}">${target}</span> へ ${bulkDevices.length}台`
+  document.getElementById('bulkDeviceList').innerHTML =
+    `<div class="d-flex flex-wrap gap-1">${bulkDevices.map(d =>
+      `<span class="badge bg-light text-dark border">${esc(d.device_id)} <span class="text-muted">${esc(d.defect_category||'')}</span></span>`).join('')}</div>`
+  buildBulkForm(target)
+  new bootstrap.Modal(document.getElementById('bulkModal')).show()
+}
+function buildBulkForm(target) {
+  const alias = myAlias(), today = new Date().toISOString().slice(0,10)
+  const genArea = document.getElementById('bulkGenArea')
+  const extra = document.getElementById('bulkExtraBtns')
+  genArea.style.display = 'none'; extra.innerHTML = ''
+  let html = `<div class="row g-2 mb-2">
+    <div class="col-md-4"><label class="form-label small fw-semibold">担当者</label>
+      <input type="text" class="form-control form-control-sm" id="bHandler" value="${esc(alias)}"></div>`
+  if (target === '修理待ち') {
+    html += `<div class="col-md-4"><label class="form-label small fw-semibold">不具合カテゴリー(共通)</label>
+      <select class="form-select form-select-sm" id="bDefCat"><option value="">(機器ごとに後で入力)</option>
+      ${DEFECT_CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="col-12"><label class="form-label small">不具合詳細(共通)</label>
+      <input type="text" class="form-control form-control-sm" id="bDefDetail"></div>`
+  } else if (target === 'SIM起票済み') {
+    html += `<div class="col-md-8"><label class="form-label small fw-bold">SIM URL <span class="text-danger">*</span> (起票後に貼り付け)</label>
+      <input type="url" class="form-control form-control-sm" id="bSimUrl" placeholder="https://t.corp.amazon.com/P123456789"></div>`
+    const types = [...new Set(bulkDevices.map(d=>d.device_type))]
+    if (types.length > 1) html += `<div class="col-12"><div class="alert alert-warning py-1 small mb-0">機種が混在しています(${types.map(typeName).join('/')})。SIMは機種ごとに分けて起票してください。</div></div>`
+  } else if (target === 'RMA登録済み') {
+    html += `<div class="col-md-5"><label class="form-label small fw-bold">Zebra RMA番号 <span class="text-danger">*</span> (このバッチ共通)</label>
+      <input type="text" class="form-control form-control-sm" id="bRma" placeholder="例: 12345678"></div>
+      <div class="col-12"><div class="alert alert-info py-1 small mb-0">⚠️ ポータル備考欄に「スワップ禁止」必須 | <a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login" target="_blank">Zebraポータル →</a> dej6-amzl-rma@amazon.com</div></div>`
+  } else if (target === '発送済み') {
+    html += `<div class="col-md-4"><label class="form-label small fw-bold">発送日 <span class="text-danger">*</span></label>
+      <input type="date" class="form-control form-control-sm" id="bShipDate" value="${today}"></div>
+      <div class="col-md-4"><label class="form-label small">伝票番号(ヤマト)</label>
+      <input type="text" class="form-control form-control-sm" id="bTracking" placeholder="1234-5678-9012"></div>
+      <div class="col-12"><div class="alert alert-warning py-1 small mb-0">Manifest同梱・返送先確認・膨張バッテリー発送禁止</div></div>`
+  } else if (target === '返却済み') {
+    html += `<div class="col-md-4"><label class="form-label small">返却日</label>
+      <input type="date" class="form-control form-control-sm" id="bRetDate" value="${today}"></div>`
+  } else if (target === '正常') {
+    html += `<div class="col-12"><div class="alert alert-success py-1 small mb-0">設定完了として全台を正常へ戻します(修理データはクリア)。</div></div>`
+  }
+  html += `</div>`
+  document.getElementById('bulkForm').innerHTML = html
+
+  // 生成物とアクションボタン
+  if (target === 'SIM起票済み') {
+    showBulkGen('SIM本文(自動生成) — コピーしてテンプレに貼り付け', buildSimText())
+    const types = [...new Set(bulkDevices.map(d=>d.device_type))]
+    extra.innerHTML = types.map(t => SIM_TEMPLATES[t]
+      ? `<a class="btn btn-warning btn-sm" href="${SIM_TEMPLATES[t]}" target="_blank"><i class="bi bi-ticket-perforated me-1"></i>${typeName(t)}テンプレを開く</a>` : '').join('')
+  } else if (target === 'RMA登録済み') {
+    showBulkGen('Zebraポータル登録用データ(タブ区切り — Excelにも貼れます)', buildRmaText())
+  } else if (target === '発送済み') {
+    extra.innerHTML = `<button class="btn btn-primary btn-sm" onclick="printManifest(bulkDevices)"><i class="bi bi-printer me-1"></i>Shipping Manifest印刷</button>`
+    showBulkGen('Slack共有文(コピーして #dej6-it-poc へ)', buildBulkSlackText())
+  }
+}
+function showBulkGen(label, text) {
+  document.getElementById('bulkGenArea').style.display = 'block'
+  document.getElementById('bulkGenLabel').textContent = label
+  document.getElementById('bulkGenText').textContent = text
+}
+window.copyBulkGen = () => {
+  navigator.clipboard.writeText(document.getElementById('bulkGenText').textContent)
+    .then(()=>toast('コピーしました 📋'))
+}
+function buildSimText() {
+  const byType = {}
+  bulkDevices.forEach(d => (byType[d.device_type] = byType[d.device_type]||[]).push(d))
+  const blocks = Object.entries(byType).map(([t, devs]) => {
+    const lines = devs.map((d,i) =>
+      `${i+1}. ${d.device_id} (${d.model||typeName(t)})\n   アセット: ${d.asset_number||'-'} / シリアル: ${d.serial_number||'-'}\n   症状: ${[d.defect_category,d.defect_detail].filter(Boolean).join(' - ')||'不具合あり'}`)
+    return `【DEJ6】${typeName(t)} 修理依頼 ${devs.length}台\n以下の機器の修理対応をお願いします。\n\n${lines.join('\n')}`
+  })
+  return blocks.join('\n\n────────────\n\n') + `\n\nサイト: DEJ6\n担当: ${myAlias()}`
+}
+function buildRmaText() {
+  const rows = bulkDevices.map((d,i) =>
+    [i+1, d.device_id, d.model||'', d.serial_number||'', DEFECT_EN[d.defect_category]||d.defect_category||'Malfunction', 'DO NOT SWAP'].join('\t'))
+  return ['No\tDevice ID\tModel\tSerial\tProblem\tNote', ...rows].join('\n')
+}
+function buildBulkSlackText() {
+  const today = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})
+  const byType = {}
+  bulkDevices.forEach(d => (byType[d.device_type] = byType[d.device_type]||[]).push(d))
+  const seg = Object.entries(byType).map(([t,devs])=>`${typeName(t)}×${devs.length}`).join(' / ')
+  return [`【一括発送】${seg} ✈️ (${today})`,
+    ...bulkDevices.map(d=>`・${d.device_id}  ${d.serial_number||''}  ${d.defect_category||''}`),
+    `担当: ${myAlias()}`, `詳細: https://trainboy1120-jpg.github.io/dej6-it-mgmt/`].join('\n')
+}
+window.saveBulk = async () => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const handler = document.getElementById('bHandler')?.value || myAlias()
+  const fields = {
+    handler,
+    defCat:    document.getElementById('bDefCat')?.value,
+    defDetail: document.getElementById('bDefDetail')?.value,
+    simUrl:    document.getElementById('bSimUrl')?.value,
+    rma:       document.getElementById('bRma')?.value,
+    shipDate:  document.getElementById('bShipDate')?.value,
+    tracking:  document.getElementById('bTracking')?.value,
+    retDate:   document.getElementById('bRetDate')?.value,
+  }
+  if (bulkTarget === 'SIM起票済み' && !(fields.simUrl||'').trim()) { toast('SIM URLを入力してください', 'danger'); return }
+  if (bulkTarget === 'RMA登録済み' && !(fields.rma||'').trim()) { toast('RMA番号を入力してください', 'danger'); return }
+  if (bulkTarget === '発送済み' && !(fields.shipDate||'').trim()) { toast('発送日を入力してください', 'danger'); return }
+  try {
+    const ids = bulkDevices.map(d=>d.device_id)
+    const idFilter = 'device_id=in.(' + ids.map(i=>'"'+i+'"').join(',') + ')'
+    const upd = statusPatch(bulkDevices[0], bulkTarget, fields)
+    await sbPatch(idFilter, upd)
+    await sbPost('repair_history', bulkDevices.map(d => ({
+      device_id: d.device_id, from_status: d.status, to_status: bulkTarget, handler,
+      note: fields.defDetail || (bulkTarget==='SIM起票済み'?fields.simUrl:'') || '一括操作',
+      zebra_rma: fields.rma || d.zebra_rma || null,
+      tracking_number: fields.tracking || null })))
+    bootstrap.Modal.getInstance(document.getElementById('bulkModal'))?.hide()
+    toast(`${ids.length}台を「${bulkTarget}」に更新しました`)
+    selection.clear()
+    await loadAll()
+  } catch(e) { toast('一括保存エラー: ' + e.message, 'danger') }
+}
+
+// ─── Shipping Manifest 印刷 ─────────────────────────
+window.printManifest = devices => {
+  const today = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})
+  const retAddr = appCfg['addr_return'] || 'DEJ6 (設定画面から返送先住所を登録してください)'
+  const groups = []
+  const zebraDevs = devices.filter(d=>ZEBRA_TYPES.includes(d.device_type))
+  const tyo4Devs  = devices.filter(d=>!ZEBRA_TYPES.includes(d.device_type))
+  if (zebraDevs.length) groups.push({ dest:'Zebra社 修理センター (Direct RMA)', addr: appCfg['addr_zebra']||'(未設定)', devs: zebraDevs })
+  if (tyo4Devs.length)  groups.push({ dest:'TYO4 青梅FC IT担当者 宛 (RMAサイト)', addr: appCfg['addr_tyo4']||'(未設定)', devs: tyo4Devs })
+  const pages = groups.map(g => `
+    <div class="page">
+      <h1>Shipping Manifest — 修理品送付明細</h1>
+      <table class="meta">
+        <tr><th>発送日</th><td>${today}</td><th>発送元</th><td>Amazon DEJ6</td></tr>
+        <tr><th>送付先</th><td colspan="3">${esc(g.dest)}<br>${esc(g.addr).replace(/\n/g,'<br>')}</td></tr>
+        <tr><th>返送先<br>(Return To)</th><td colspan="3"><strong>${esc(retAddr).replace(/\n/g,'<br>')}</strong></td></tr>
+      </table>
+      <table class="items">
+        <thead><tr><th>No</th><th>機器ID</th><th>Model</th><th>Serial</th><th>RMA#</th><th>症状</th></tr></thead>
+        <tbody>${g.devs.map((d,i)=>`<tr><td>${i+1}</td><td>${esc(d.device_id)}</td><td>${esc(d.model)}</td>
+          <td>${esc(d.serial_number)}</td><td>${esc(d.zebra_rma)}</td><td>${esc(d.defect_category||'')}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="6">合計: ${g.devs.length} 台</td></tr></tfoot>
+      </table>
+      <p class="warn">⚠ スワップ禁止 (DO NOT SWAP) / 返送先住所を必ずご確認ください</p>
+      <p class="sign">担当者: ${esc(myAlias())} ____________　確認者: ____________</p>
+    </div>`).join('')
+  const w = window.open('', '_blank')
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>Shipping Manifest DEJ6 ${today}</title>
+    <style>
+      body{font-family:'Segoe UI','Yu Gothic',sans-serif;margin:24px;color:#111}
+      h1{font-size:18px;border-bottom:3px solid #111;padding-bottom:6px}
+      table{border-collapse:collapse;width:100%;margin-bottom:14px}
+      th,td{border:1px solid #333;padding:6px 8px;font-size:12px;text-align:left}
+      .meta th{background:#eee;width:90px}
+      .items thead th{background:#1e293b;color:#fff}
+      .warn{font-weight:bold;background:#fff3cd;padding:8px;border:2px solid #b8860b;font-size:13px}
+      .sign{margin-top:28px;font-size:13px}
+      .page{page-break-after:always}
+      @media print{ .page:last-child{page-break-after:auto} }
+    </style></head><body>${pages}<script>window.onload=()=>window.print()<\/script></body></html>`)
+  w.document.close()
+}
+
+// ─── 履歴 ─────────────────────────────────────────
 window.openHistory = async id => {
   document.getElementById('hDeviceId').textContent = id
   document.getElementById('historyBody').innerHTML = '<div class="text-center py-3 text-muted">読み込み中...</div>'
   new bootstrap.Modal(document.getElementById('historyModal')).show()
-  const c = cfg()
-  if (!c.url || !c.key) { document.getElementById('historyBody').innerHTML = '未接続'; return }
   try {
-    const data = await sbGet(`repair_history?device_id=eq.${encodeURIComponent(id)}&order=created_at.desc`)
-    if (!data?.length) {
-      document.getElementById('historyBody').innerHTML = '<div class="text-muted py-2">履歴なし</div>'
-      return
-    }
-    document.getElementById('historyBody').innerHTML = data.map(h => `
-      <div class="history-item">
-        <div class="d-flex justify-content-between align-items-start">
-          <span class="status-badge status-${h.to_status}">${h.to_status}</span>
-          <small class="text-muted">${new Date(h.created_at).toLocaleString('ja-JP')}</small>
-        </div>
-        <div class="small mt-1">
-          ${h.from_status ? `<span class="text-muted">${h.from_status} →</span> ` : ''}
-          <strong>${h.to_status}</strong>${h.handler ? ` / ${h.handler}` : ''}
-        </div>
-        ${h.note ? `<div class="small text-secondary mt-1">${h.note}</div>` : ''}
-        ${h.zebra_rma ? `<div class="small text-info">RMA: ${h.zebra_rma}</div>` : ''}
-        ${h.tracking_number ? `<div class="small text-info">伝票: ${h.tracking_number}</div>` : ''}
-      </div>`).join('')
+    const data = await sbGet(`repair_history?device_id=eq.${encodeURIComponent(id)}&order=created_at.desc&limit=50`)
+    document.getElementById('historyBody').innerHTML = !data?.length
+      ? '<div class="text-muted py-2">履歴なし</div>'
+      : data.map(h => `<div class="history-item">
+          <div class="d-flex justify-content-between align-items-start">
+            <span class="status-badge status-${esc(LEGACY[h.to_status]||h.to_status)}">${esc(h.to_status)}</span>
+            <small class="text-muted">${new Date(h.created_at).toLocaleString('ja-JP')}</small></div>
+          <div class="small mt-1">${h.from_status?`<span class="text-muted">${esc(h.from_status)} →</span> `:''}<strong>${esc(h.to_status)}</strong>${h.handler?` / ${esc(h.handler)}`:''}</div>
+          ${h.note?`<div class="small text-secondary mt-1">${esc(h.note)}</div>`:''}
+          ${h.zebra_rma?`<div class="small text-info">RMA: ${esc(h.zebra_rma)}</div>`:''}
+          ${h.tracking_number?`<div class="small text-info">伝票: ${esc(h.tracking_number)}</div>`:''}</div>`).join('')
   } catch(e) {
-    document.getElementById('historyBody').innerHTML = `<div class="text-danger">読み込みエラー: ${e.message}</div>`
+    document.getElementById('historyBody').innerHTML = `<div class="text-danger">読み込みエラー: ${esc(e.message)}</div>`
   }
 }
 
-// ─── Toast ───────────────────────────────────────
-function toast(msg, type='success') {
-  const el = document.getElementById('appToast')
-  el.className = `toast align-items-center text-white border-0 bg-${type}`
-  document.getElementById('toastMsg').textContent = msg
-  bootstrap.Toast.getOrCreateInstance(el, {delay:4000}).show()
+// ─── マスタ設定 ────────────────────────────────────
+window.openConfig = () => {
+  document.getElementById('cfgAddrZebra').value  = appCfg['addr_zebra'] || ''
+  document.getElementById('cfgAddrTyo4').value   = appCfg['addr_tyo4'] || ''
+  document.getElementById('cfgAddrReturn').value = appCfg['addr_return'] || ''
+  document.getElementById('cfgStagDays').value   = cfgNum('stagnation_days', 14)
+  document.getElementById('cfgThreshold').value  = cfgNum('alert_threshold', 10)
+  new bootstrap.Modal(document.getElementById('configModal')).show()
 }
-
-// ─── SOP ─────────────────────────────────────────
-window.openSOP = () => {
-  new bootstrap.Modal(document.getElementById('sopModal')).show()
+window.saveConfig = async () => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const rows = [
+    { key:'addr_zebra',      value: document.getElementById('cfgAddrZebra').value },
+    { key:'addr_tyo4',       value: document.getElementById('cfgAddrTyo4').value },
+    { key:'addr_return',     value: document.getElementById('cfgAddrReturn').value },
+    { key:'stagnation_days', value: String(document.getElementById('cfgStagDays').value||'14') },
+    { key:'alert_threshold', value: String(document.getElementById('cfgThreshold').value||'10') },
+  ].map(r => ({...r, updated_by: myAlias(), updated_at: new Date().toISOString()}))
+  try {
+    await sbPost('app_config', rows, 'resolution=merge-duplicates,return=minimal')
+    bootstrap.Modal.getInstance(document.getElementById('configModal'))?.hide()
+    toast('マスタ設定を保存しました(全員に反映)')
+    await loadAll()
+  } catch(e) { toast('設定保存エラー: ' + e.message, 'danger') }
 }
+window.openSOP = () => new bootstrap.Modal(document.getElementById('sopModal')).show()
 
-// ─── 起動 ────────────────────────────────────────
-initSB()
+// ─── 起動 ─────────────────────────────────────────
+applyEditorUI()
+loadAll()
+// 5分毎に自動リフレッシュ(現場で開きっぱなし運用を想定)
+setInterval(loadAll, 300000)
 </script>
 </body>
 </html>
