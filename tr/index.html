@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEJ6 TR進捗管理</title>
+<style>
+:root{--green:#217346;--blue:#2b6cb0;--red:#c00000;--lred:#fce4e4;--yel:#fff2cc;--bg:#f5f6f8;--card:#fff;--border:#d9dde3;--txt:#1a202c;--mut:#718096}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI","Hiragino Sans","Meiryo",sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+header{background:var(--green);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:16px;margin-right:auto}
+select,button,input{font:inherit}
+.hsel{padding:5px 8px;border-radius:6px;border:none}
+.tabs{display:flex;gap:2px;background:#fff;border-bottom:2px solid var(--green);padding:0 10px}
+.tab{padding:9px 16px;border:none;background:none;cursor:pointer;font-weight:600;color:var(--mut);border-bottom:3px solid transparent}
+.tab.on{color:var(--green);border-bottom-color:var(--green)}
+main{max-width:1080px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+.card h2{font-size:14px;margin-bottom:10px}
+.mut{color:var(--mut);font-size:12px}
+.rolebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.rbtn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-weight:600}
+.rbtn.trainer.on{background:var(--green);color:#fff;border-color:var(--green)}
+.rbtn.trainee.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.blockh{background:#eef2ee;font-weight:700;padding:7px 10px;border-radius:6px;margin:14px 0 6px}
+.item{display:grid;grid-template-columns:1fr 118px 118px 52px 34px;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);border-radius:6px}
+.item.gap1{background:var(--yel)}
+.item.gap2{background:var(--lred)}
+.iname{font-size:13px}
+.seg{display:flex;gap:3px}
+.seg button{flex:1;padding:5px 0;border:1px solid var(--border);background:#fff;border-radius:5px;cursor:pointer;font-weight:700;color:var(--mut)}
+.seg.trainer button.sel{background:var(--green);color:#fff;border-color:var(--green)}
+.seg.trainee button.sel{background:var(--blue);color:#fff;border-color:var(--blue)}
+.seg button:disabled{cursor:not-allowed;opacity:.55}
+.gapb{text-align:center;font-weight:700;border-radius:6px;padding:4px 0}
+.gapb.g0{color:#38a169}.gapb.g1{background:#f6cf5e}.gapb.g2{background:var(--red);color:#fff}
+.noteb{border:none;background:none;cursor:pointer;font-size:16px}
+.colh{display:grid;grid-template-columns:1fr 118px 118px 52px 34px;gap:8px;padding:4px 10px;font-size:11px;font-weight:700}
+.colh .t1{color:var(--green)}.colh .t2{color:var(--blue)}
+.barrow{display:grid;grid-template-columns:150px 1fr 64px;gap:10px;align-items:center;padding:5px 0}
+.barbg{height:18px;background:#edf0f3;border-radius:9px;overflow:hidden;position:relative}
+.barfill{height:100%;border-radius:9px;transition:width .4s}
+.barlbl{position:absolute;right:6px;top:1px;font-size:11px;font-weight:700}
+.gappill{font-weight:700;text-align:center;border-radius:6px;padding:3px 0;font-size:12px}
+.gappill.warn{background:var(--lred);color:var(--red)}
+.blkcard{padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.blkcard.warn{border-color:var(--red);background:#fff8f8}
+table{width:100%;border-collapse:collapse}
+th{background:var(--green);color:#fff;padding:6px 8px;font-size:12px;text-align:left}
+td{padding:6px 8px;border-bottom:1px solid var(--border);font-size:13px}
+tr.warn td{background:var(--lred)}
+.big{padding:9px 16px;border-radius:8px;border:none;background:var(--green);color:#fff;font-weight:700;cursor:pointer}
+.top5 li{margin:6px 0 6px 20px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:9px 18px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:50}
+#toast.show{opacity:1}
+.empty{text-align:center;padding:30px;color:var(--mut)}
+@media(max-width:640px){.item,.colh{grid-template-columns:1fr 96px 96px 40px 28px}.barrow{grid-template-columns:100px 1fr 52px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>DEJ6 TR進捗管理</h1>
+  <select id="traineeSel" class="hsel"></select>
+  <button class="hsel" onclick="addTrainee()">＋トレーニー追加</button>
+</header>
+<div class="tabs">
+  <button class="tab on" data-t="dash" onclick="showTab('dash')">ダッシュボード</button>
+  <button class="tab" data-t="input" onclick="showTab('input')">入力</button>
+  <button class="tab" data-t="weekly" onclick="showTab('weekly')">週次推移</button>
+  <button class="tab" data-t="help" onclick="showTab('help')">使い方</button>
+</div>
+<main>
+  <div id="tab-dash"></div>
+  <div id="tab-input" style="display:none"></div>
+  <div id="tab-weekly" style="display:none"></div>
+  <div id="tab-help" style="display:none">
+    <div class="card">
+      <h2>使い方</h2>
+      <p><b>評価基準（3段階）</b>: 1=理解できていない ／ 2=サポートがあればできる ／ 3=1人で出来る</p>
+      <p class="mut" style="margin:4px 0 10px">目安: 見せた10% / 説明した20% / 一緒に実施50% / 一人でできた(確認あり)70% / 確認不要100%</p>
+      <p><b>毎日</b>: トレーナー・トレーニーがそれぞれ「入力」タブで自分の評価を入力(合言葉が必要)。差が出た項目は自動で黄/赤ハイライト。</p>
+      <p><b>週1回の1on1</b>: ダッシュボードの「1on1優先項目」からすり合わせ→合意したら週次推移でスナップショットを記録。</p>
+      <p style="margin-top:10px"><b>他サイトへの展開</b>: このWeb版はDEJ6専用。横展開にはSharePoint版Excelテンプレを使うこと(評価データを社外サービスに置かないため)。</p>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+const SB='https://tetigwcotdqgkwfswbyc.supabase.co/rest/v1';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRldGlnd2NvdGRxZ2t3ZnN3YnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzQxNDgsImV4cCI6MjA5Njg1MDE0OH0.8akyRPHCOX3wfKdIqvoaJdq2D8i--Z1jBLS2RLJOuaQ';
+const PIN_HASH='234e868d9cba7aebec194aaa2d7eb69e36ac55f348cda1ea6eb5acaa06bafcbe';
+const TARGETS=['15%','40%','60%','85%','100%','One Operation'];
+let items=[],trainees=[],ratings={},weekly=[],cur=null,mode='view';
+
+const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+async function api(path,opt={}){
+  const r=await fetch(SB+path,{...opt,headers:{...H,...(opt.headers||{})}});
+  if(!r.ok){const t=await r.text();throw new Error(r.status+' '+t.slice(0,200));}
+  return r.status===204?null:r.json();
+}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+async function sha256(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+async function ensurePin(){
+  if(sessionStorage.getItem('tr_auth')==='1')return true;
+  const p=prompt('編集用の合言葉を入力してください');
+  if(p===null)return false;
+  if(await sha256(p.trim())===PIN_HASH){sessionStorage.setItem('tr_auth','1');return true;}
+  toast('合言葉が違います');return false;
+}
+
+async function load(){
+  try{
+    [items,trainees]=await Promise.all([
+      api('/tr_items?active=eq.true&order=sort'),
+      api('/tr_trainees?order=created_at')
+    ]);
+  }catch(e){
+    document.querySelector('main').innerHTML='<div class="card"><b>接続エラー</b><br><span class="mut">'+esc(e.message)+'<br>migration_tr_v1.sql が未実行、またはSupabase一時停止の可能性。</span></div>';
+    return;
+  }
+  const sel=document.getElementById('traineeSel');
+  sel.innerHTML=trainees.map(t=>`<option value="${t.id}">${esc(t.alias)}（Trainer: ${esc(t.trainer_alias)}）</option>`).join('')||'<option value="">トレーニー未登録</option>';
+  sel.onchange=()=>{cur=trainees.find(t=>t.id==sel.value)||null;loadTrainee();};
+  cur=trainees[0]||null;
+  await loadTrainee();
+}
+async function loadTrainee(){
+  ratings={};weekly=[];
+  if(cur){
+    const[rs,ws]=await Promise.all([
+      api('/tr_ratings?trainee_id=eq.'+cur.id),
+      api('/tr_weekly?trainee_id=eq.'+cur.id+'&order=week_no')
+    ]);
+    for(const r of rs){(ratings[r.item_id]=ratings[r.item_id]||{})[r.rater]=r;}
+    weekly=ws;
+  }
+  renderAll();
+}
+function renderAll(){renderDash();renderInput();renderWeekly();}
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  for(const k of['dash','input','weekly','help'])document.getElementById('tab-'+k).style.display=k===t?'':'none';
+}
+function pct(rater,list){
+  const sc=list.map(i=>ratings[i.id]?.[rater]?.score).filter(s=>s);
+  if(!sc.length)return null;
+  return sc.reduce((a,s)=>a+(s-1)/2,0)/sc.length;
+}
+function bar(label,val,color){
+  const v=val===null?0:Math.round(val*100);
+  return `<div class="barrow"><span style="font-size:12px;font-weight:600">${label}</span>
+    <div class="barbg"><div class="barfill" style="width:${v}%;background:${color}"></div><span class="barlbl">${val===null?'未入力':v+'%'}</span></div><span></span></div>`;
+}
+
+function renderDash(){
+  const el=document.getElementById('tab-dash');
+  if(!cur){el.innerHTML='<div class="card empty">トレーニーを追加してください（右上の「＋トレーニー追加」）</div>';return;}
+  const blocks=[...new Set(items.map(i=>i.block))];
+  const oT=pct('trainer',items),oE=pct('trainee',items);
+  const oGap=(oT!==null&&oE!==null)?Math.round(Math.abs(oT-oE)*100):null;
+  let html=`<div class="card"><h2>総合（${esc(cur.alias)} / Trainer: ${esc(cur.trainer_alias)}）</h2>
+    ${bar('トレーナー評価',oT,'var(--green)')}${bar('トレーニー自己評価',oE,'var(--blue)')}
+    <div class="gappill ${oGap>=20?'warn':''}" style="margin-top:6px">${oGap===null?'ズレ: —':'ズレ '+oGap+'pt'+(oGap>=20?' — 1on1で確認推奨':'')}</div></div>`;
+  html+='<div class="card"><h2>ブロック別</h2>';
+  for(const b of blocks){
+    const list=items.filter(i=>i.block===b);
+    const t=pct('trainer',list),e=pct('trainee',list);
+    const g=(t!==null&&e!==null)?Math.round(Math.abs(t-e)*100):null;
+    html+=`<div class="blkcard ${g>=20?'warn':''}"><b style="font-size:13px">${esc(b)}</b>
+      ${g>=20?'<span style="color:var(--red);font-weight:700;font-size:12px;float:right">ズレ '+g+'pt</span>':''}
+      ${bar('Trainer',t,'var(--green)')}${bar('Trainee',e,'var(--blue)')}</div>`;
+  }
+  html+='</div>';
+  const gaps=items.map(i=>{
+    const t=ratings[i.id]?.trainer?.score,e=ratings[i.id]?.trainee?.score;
+    return(t&&e&&t!==e)?{i,g:Math.abs(t-e),t,e}:null;
+  }).filter(Boolean).sort((a,b)=>b.g-a.g).slice(0,5);
+  html+='<div class="card"><h2>1on1優先項目 TOP5（評価のズレが大きい順）</h2>';
+  html+=gaps.length?'<ol class="top5">'+gaps.map(x=>
+    `<li><b>${esc(x.i.name)}</b><span class="mut">（${esc(x.i.block)}）</span><br>
+     <span style="color:var(--green)">Trainer: ${x.t}</span> / <span style="color:var(--blue)">Trainee: ${x.e}</span>
+     <span style="color:var(--red);font-weight:700">差${x.g}</span></li>`).join('')+'</ol>'
+    :'<p class="mut">評価のズレている項目はありません（または両者の入力がまだ揃っていません）</p>';
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function renderInput(){
+  const el=document.getElementById('tab-input');
+  if(!cur){el.innerHTML='<div class="card empty">トレーニーを追加してください</div>';return;}
+  let html=`<div class="rolebar"><span style="font-weight:700">入力モード:</span>
+    <button class="rbtn trainer ${mode==='trainer'?'on':''}" onclick="setMode('trainer')">トレーナーとして入力</button>
+    <button class="rbtn trainee ${mode==='trainee'?'on':''}" onclick="setMode('trainee')">トレーニーとして入力</button>
+    <span class="mut">1=理解できていない / 2=サポートがあればできる / 3=1人で出来る</span></div>`;
+  html+=`<div class="colh"><span>項目</span><span class="t1">トレーナー評価</span><span class="t2">トレーニー自己評価</span><span>ズレ</span><span></span></div>`;
+  const blocks=[...new Set(items.map(i=>i.block))];
+  for(const b of blocks){
+    html+=`<div class="blockh">${esc(b)}</div>`;
+    for(const it of items.filter(i=>i.block===b)){
+      const t=ratings[it.id]?.trainer?.score,e=ratings[it.id]?.trainee?.score;
+      const g=(t&&e)?Math.abs(t-e):null;
+      const note=ratings[it.id]?.trainer?.note||ratings[it.id]?.trainee?.note||'';
+      html+=`<div class="item ${g===1?'gap1':''} ${g>=2?'gap2':''}">
+        <span class="iname">${esc(it.name)}${note?'<br><span class="mut">📝'+esc(note)+'</span>':''}</span>
+        <span class="seg trainer">${[1,2,3].map(s=>`<button ${mode!=='trainer'?'disabled':''} class="${t===s?'sel':''}" onclick="rate(${it.id},'trainer',${s})">${s}</button>`).join('')}</span>
+        <span class="seg trainee">${[1,2,3].map(s=>`<button ${mode!=='trainee'?'disabled':''} class="${e===s?'sel':''}" onclick="rate(${it.id},'trainee',${s})">${s}</button>`).join('')}</span>
+        <span class="gapb ${g===null?'':'g'+Math.min(g,2)}">${g===null?'—':g}</span>
+        <button class="noteb" title="1on1メモ" onclick="editNote(${it.id})">📝</button>
+      </div>`;
+    }
+  }
+  el.innerHTML=html;
+}
+async function setMode(m){
+  if(!await ensurePin())return;
+  mode=(mode===m)?'view':m;
+  renderInput();
+}
+async function rate(itemId,rater,score){
+  if(mode!==rater)return;
+  try{
+    await api(`/tr_ratings?on_conflict=trainee_id,item_id,rater`,{
+      method:'POST',
+      headers:{Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify({trainee_id:cur.id,item_id:itemId,rater,score,updated_at:new Date().toISOString()})
+    });
+    (ratings[itemId]=ratings[itemId]||{})[rater]={...(ratings[itemId][rater]||{}),score,rater};
+    renderInput();renderDash();
+  }catch(e){toast('保存失敗: '+e.message);}
+}
+async function editNote(itemId){
+  if(mode==='view'){toast('先に入力モードを選択してください');return;}
+  const curNote=ratings[itemId]?.[mode]?.note||'';
+  const n=prompt('1on1メモ（すり合わせ内容・合意事項）',curNote);
+  if(n===null)return;
+  if(!ratings[itemId]?.[mode]?.score){toast('先にこの項目の評価を入力してください');return;}
+  try{
+    await api(`/tr_ratings?trainee_id=eq.${cur.id}&item_id=eq.${itemId}&rater=eq.${mode}`,{
+      method:'PATCH',body:JSON.stringify({note:n})});
+    ratings[itemId][mode].note=n;
+    renderInput();
+  }catch(e){toast('保存失敗: '+e.message);}
+}
+
+function renderWeekly(){
+  const el=document.getElementById('tab-weekly');
+  if(!cur){el.innerHTML='<div class="card empty">トレーニーを追加してください</div>';return;}
+  let html='<div class="card"><h2>週次推移（1on1のたびに記録）</h2><table><tr><th>Week</th><th>日付</th><th>Trainer%</th><th>Trainee%</th><th>ズレpt</th><th>Target</th><th>1on1メモ</th></tr>';
+  for(const w of weekly){
+    const g=(w.trainer_pct!==null&&w.trainee_pct!==null)?Math.round(Math.abs(w.trainer_pct-w.trainee_pct)):null;
+    html+=`<tr class="${g>=20?'warn':''}"><td>${w.week_no}週目</td><td>${(w.created_at||'').slice(0,10)}</td>
+      <td>${w.trainer_pct===null?'—':Math.round(w.trainer_pct)+'%'}</td><td>${w.trainee_pct===null?'—':Math.round(w.trainee_pct)+'%'}</td>
+      <td>${g===null?'—':g}</td><td>${esc(w.target_label||'')}</td><td>${esc(w.memo||'')}</td></tr>`;
+  }
+  html+='</table>';
+  if(!weekly.length)html+='<p class="mut" style="margin-top:8px">まだ記録がありません。</p>';
+  html+='<div style="margin-top:12px"><button class="big" onclick="snapshot()">今週のスナップショットを記録</button> <span class="mut">現時点のダッシュボード値を保存します</span></div></div>';
+  el.innerHTML=html;
+}
+async function snapshot(){
+  if(!await ensurePin())return;
+  const t=pct('trainer',items),e=pct('trainee',items);
+  if(t===null&&e===null){toast('評価が未入力です');return;}
+  const wk=(weekly.length?Math.max(...weekly.map(w=>w.week_no)):0)+1;
+  const memo=prompt(`${wk}週目のスナップショットを記録します。1on1メモ（任意）`,'');
+  if(memo===null)return;
+  try{
+    await api('/tr_weekly',{method:'POST',body:JSON.stringify({
+      trainee_id:cur.id,week_no:wk,
+      trainer_pct:t===null?null:t*100,trainee_pct:e===null?null:e*100,
+      target_label:TARGETS[wk-1]||'',memo})});
+    await loadTrainee();showTab('weekly');toast(wk+'週目を記録しました');
+  }catch(e2){toast('保存失敗: '+e2.message);}
+}
+async function addTrainee(){
+  if(!await ensurePin())return;
+  const alias=prompt('トレーニーのalias（例: yumakash）※氏名でなくaliasを使うこと');if(!alias)return;
+  const tr=prompt('トレーナーのalias');if(!tr)return;
+  try{
+    await api('/tr_trainees',{method:'POST',body:JSON.stringify({alias:alias.trim(),trainer_alias:tr.trim(),start_date:new Date().toISOString().slice(0,10)})});
+    await load();toast('追加しました');
+  }catch(e){toast('追加失敗: '+e.message);}
+}
+load();
+</script>
+</body>
+</html>
