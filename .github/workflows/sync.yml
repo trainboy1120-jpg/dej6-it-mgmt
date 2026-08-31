@@ -21,6 +21,20 @@ jobs:
       - name: Run sync
         run: python3 scripts/sync.py
 
+      # qr-app本体のSupabase(uaxyskjcvfpzuobfcynx)はsync.pyでは一切触らないため、
+      # ここで専用keep-aliveを行う(HTTP 401でも「到達=活動」扱いで停止を防げる)。
+      # code=000は DNS不達=一時停止の疑い → わざと失敗させてメール通知で気付く。
+      # if: always() でsync.pyが失敗してもkeep-aliveだけは必ず走らせる。
+      - name: Keep-alive qr-app Supabase (uaxyskjcvfpzuobfcynx)
+        if: always()
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 https://uaxyskjcvfpzuobfcynx.supabase.co/rest/v1/)
+          echo "qr-app supabase http=$code"
+          if [ "$code" = "000" ]; then
+            echo "::error::qr-app Supabaseに到達できません(一時停止の疑い)。supabase.com/dashboard/project/uaxyskjcvfpzuobfcynx でRESUMEしてください"
+            exit 1
+          fi
+
       # GitHubは60日commitがないリポジトリのscheduleを自動無効化する。
       # 最終commitから25日以上経っていたらハートビートcommitを積んで延命する。
       - name: Heartbeat commit (keep schedules alive)
