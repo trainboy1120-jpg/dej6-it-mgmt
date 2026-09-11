@@ -1,4 +1,4 @@
-# DEJ6 IT機器管理システム v2
+# DEJ6 IT機器管理システム v2.1
 
 DEJ6のIT機器(SSP/FS/ZD611/無線機ほか479台)の修理フローを管理するWebツール。
 **閲覧は設定不要** — https://trainboy1120-jpg.github.io/dej6-it-mgmt/ を開くだけ。
@@ -16,6 +16,7 @@ DEJ6のIT機器(SSP/FS/ZD611/無線機ほか479台)の修理フローを管理�
 | Shipping Manifest | 印刷用の送付明細を自動生成。宛先はZebra社/TYO4を機種で自動切替 |
 | 朝のダイジェスト | 毎朝8:00に #dej6-it-poc へ修理状況・滞留・実箱との突合を自動投稿 |
 | 編集権限 | SA/IT POCメンバーのみ(エイリアス+共有PIN)。全変更は履歴に記録 |
+| 修理手順ガイド (v2.1) | ナビ[修理手順]または機器モーダルの「この機種の修理手順」から、機種別の手順(A 修理前に試す / B フロー / C 復帰チェック / D リンク集 / E 発送の鉄則)を表示。現在ステータスに「いまここ」印。`?guide=SSP` 等のディープリンク・URLコピー・印刷(A4)対応 |
 
 ## 機種別修理フロー (JP-OTS Wiki準拠)
 
@@ -44,7 +45,15 @@ scripts/digest.py             朝のSlackダイジェスト (毎朝8:00 JST)
 migration_v2.sql              v1→v2 マイグレーションSQL
 supabase_setup.sql            初期構築SQL (v1・参考)
 index_v1_backup.html          v1バックアップ
+docs/repair_guide_plan.md     v2.1 修理手順ガイドの設計プラン(cross-model review PASS)
+docs/mockup/                  v2.1 モック・実装スクショ・チェッカー(識別子衝突/1行1操作)
+tests/run_all.py              v2.1 テスト一括実行 (静的 test_repair_guide.py + Playwright test_repair_guide_e2e.py)
 ```
+
+### v2.1 修理手順ガイドの更新方法
+- 手順本文は `index.html` 内の定数 `GUIDE_DATA`(機種別) / `GUIDE_STEP_BASE`(ステータス共通)。編集後は `py tests/run_all.py` で全PASSを確認(1ステップ1操作・フローとの整合・リンクが https であることを機械チェック)
+- e2e は Supabase/Firebase をスタブして file:// で動くため、実データには触れない。要: `py -m pip install playwright` + `py -m playwright install chromium`
+- 手順の出典は JP-OTS QuickLink Wiki。訂正・追加は #dej6-it-poc へ
 
 - DB: Supabase (tetigwcotdqgkwfswbyc) — RLS無効の内部運用ツール
 - SSP稼働状況: qr-app Firebase (ssp-rental) — 読み取りのみ、qr-app側は変更しない

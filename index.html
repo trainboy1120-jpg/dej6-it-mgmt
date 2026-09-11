@@ -54,6 +54,24 @@ body { background:#f0f4f8; font-size:.9rem; }
   #deviceTable { font-size:.8rem; }
   .hide-sm { display:none; }
 }
+/* ── 修理手順ガイド(v2.1) ── */
+.guide-tabs { overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; }
+.guide-tabs .nav-link { font-size:.82rem; padding:.3rem .8rem; border-radius:20px; }
+.guide-tabs .nav-link.active { background:#1e293b; }
+.guide-summary { background:#fff; border:1px solid #dee2e6; border-radius:10px; }
+.guide-flow .status-badge { font-size:.7rem; }
+.guide-flow .bi-arrow-right { color:#94a3b8; font-size:.8rem; }
+.guide-step { border:1px solid #dee2e6; border-left:6px solid #94a3b8; border-radius:8px; background:#fff; }
+.guide-step.current { border-left-color:#198754; box-shadow:0 0 0 3px rgba(25,135,84,.18); }
+.guide-step .step-no { width:1.7rem; height:1.7rem; border-radius:50%; background:#1e293b; color:#fff; font-weight:700; font-size:.8rem; display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.guide-step ol.actions { padding-left:1.2rem; margin-bottom:.4rem; }
+.guide-step ol.actions li { margin-bottom:.15rem; }
+.guide-done { background:#d1f2eb; color:#0b5e3f; border-radius:6px; padding:.3rem .6rem; font-size:.8rem; }
+.guide-caution { background:#fff3cd; color:#7a5700; border-radius:6px; padding:.3rem .6rem; font-size:.8rem; }
+.guide-links .btn { font-size:.78rem; }
+.first-aid li { margin-bottom:.25rem; }
+.here-badge { background:#198754; color:#fff; font-size:.68rem; padding:.18em .55em; border-radius:10px; font-weight:700; }
+@media (max-width:767px){ .guide-step{font-size:.85rem} }
 </style>
 </head>
 <body>
@@ -65,6 +83,7 @@ body { background:#f0f4f8; font-size:.9rem; }
       <span id="editorBadge" class="badge bg-secondary d-none"></span>
       <button id="loginBtn" class="btn btn-sm btn-warning fw-bold" onclick="openLogin()"><i class="bi bi-unlock me-1"></i>編集モード</button>
       <button id="logoutBtn" class="btn btn-sm btn-outline-secondary d-none" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
+      <button class="btn btn-sm btn-info fw-bold text-dark" onclick="guideOpen(typeFilter==='ALL'?'SSP':typeFilter)"><i class="bi bi-tools me-1"></i>修理手順</button>
       <button class="btn btn-sm btn-outline-info" onclick="openSOP()"><i class="bi bi-question-circle me-1"></i>使い方</button>
       <button id="configBtn" class="btn btn-sm btn-outline-light d-none" onclick="openConfig()"><i class="bi bi-gear"></i></button>
     </div>
@@ -216,7 +235,8 @@ body { background:#f0f4f8; font-size:.9rem; }
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header py-2" style="background:#1e293b">
-        <h6 class="modal-title text-white"><i class="bi bi-pencil-square me-2"></i><span id="mDeviceId"></span> <span id="mType" class="ms-1"></span> <small class="text-secondary ms-2" id="mModel"></small></h6>
+        <h6 class="modal-title text-white"><i class="bi bi-pencil-square me-2"></i><span id="mDeviceId"></span> <span id="mType" class="ms-1"></span> <small class="text-secondary ms-2" id="mModel"></small>
+          <button type="button" class="btn btn-sm btn-outline-info py-0 ms-3" id="mGuideBtn" onclick="guideOpenFromStatus()"><i class="bi bi-tools me-1"></i>この機種の修理手順</button></h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -347,6 +367,26 @@ body { background:#f0f4f8; font-size:.9rem; }
   </div>
 </div>
 
+<!-- 修理手順ガイド モーダル(v2.1) -->
+<div class="modal fade" id="guideModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-tools me-2 text-info"></i>修理手順ガイド <small class="text-secondary ms-2">壊れたらこの順番で</small></h6>
+        <div class="ms-auto d-flex gap-2 me-2">
+          <button class="btn btn-sm btn-outline-light py-0" id="guideCopyBtn" onclick="guideCopyUrl()" title="この機種のURLをコピー"><i class="bi bi-link-45deg"></i><span class="d-none d-sm-inline"> URLコピー</span></button>
+          <button class="btn btn-sm btn-outline-light py-0" id="guidePrintBtn" onclick="guidePrint()" title="A4で印刷(2〜3枚)して修理箱の横に置く"><i class="bi bi-printer"></i><span class="d-none d-sm-inline"> 印刷</span></button>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-3">
+        <ul class="nav nav-pills guide-tabs flex-nowrap gap-1 mb-3" id="guideTabs"></ul>
+        <div id="guideBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 使い方(SOP)モーダル -->
 <div class="modal fade" id="sopModal" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -444,7 +484,181 @@ const DEFECT_EN = {
   'ログイン不可':'Cannot login', 'ペアリング不可':'Pairing failure', '画面不良':'Display issue',
   'トリガー破損':'Broken trigger', 'ベルト破損':'Broken strap', '接続不良':'Connection issue', 'その他':'Other'
 }
-const TYPE_LABEL = { Radio:'無線機', Mobile:'携帯' }
+const TYPE_LABEL = { Radio:'無線機', Mobile:'携帯', Other:'その他' }
+
+// ─── 修理手順ガイド v2.1: 本文データ ─────────────────
+// 本文の書き方: actions は「1行=利用者が一度にできる1操作」、done は既存ステータスの正式名で書く
+const GUIDE_URL_WIKI  = 'https://w.amazon.com/bin/view/JP-OTS/AMZL-EF-Function/QuickLink/AMZL/'
+const GUIDE_URL_ZEBRA = 'https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login'
+const GUIDE_URL_SLACK = 'https://amazon.enterprise.slack.com/archives/C09CPS3UN2Z'
+// FLOWS に無い type(Other 等)の既定フロー。実装時は openStatus の既定配列もこの定数を参照させる(二重管理しない)
+const GUIDE_DEFAULT_FLOW = ['修理待ち','SIM起票済み','発送済み','返却済み','正常']
+
+// 全機種共通のステップ本文。機種固有は各ガイドの step_extra で上書きする:
+//   actions を持つ step_extra は必ず replace:true(共通 actions/cautions を丸ごと置換。追記モードは無い) / cautions だけの step_extra は共通 cautions に追記 / title・done は個別に上書き可
+//   fallback:{title, actions[]} = 条件付きの代替手順(例: qr-app が使えない時)。actions と同じ1行1操作で書き、カード内に折りたたみ無しの小見出しで表示
+const GUIDE_STEP_BASE = {
+  '修理待ち': {
+    title: '故障を登録して修理箱へ',
+    actions: ['機器の番号(機器ID)を確認する', 'このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す', '機器を所定の修理箱へ入れる'],
+    done: '一覧のステータスが「修理待ち」(赤)になっている',
+    cautions: ['膨張・破損したバッテリーは修理箱に入れない(サイト内e-wasteルールで廃棄)'],
+  },
+  'SIM起票済み': {
+    title: 'SIMチケットを起票',
+    actions: ['「今日やること」の SIM起票 を押す(依頼文が自動生成される)', '「コピー」で依頼文をコピーする', 'SIMテンプレートを開く(下のリンク)', '依頼文を貼り付ける', '起票する', '起票できたSIMのURLをこのツールの「SIM URL」欄に貼る', '「一括保存」を押す'],
+    done: 'ステータスが「SIM起票済み」(橙)になり、一覧の機器にSIM URLが入っている',
+    cautions: ['同じ機種の機器はまとめて1件のSIMでよい(一覧で複数選択 → SIM起票済み)'],
+  },
+  'RMA登録済み': {
+    title: 'Zebraポータルで RMA を登録',
+    actions: ['「今日やること」の RMA登録 を押す(登録用データが表になる)', '「コピー」で登録用データをコピーする', 'Zebra修理ポータルを開く(下のリンク)', 'dej6-amzl-rma@amazon.com でログインする', 'シリアルを入力する', '症状(英訳)を貼り付ける', '備考欄に「スワップ禁止」と入力する', '内容を確認する', '送信する', '発行された RMA番号 をこのツールの「RMA番号」欄に入力する', '「一括保存」を押す'],
+    done: 'ステータスが「RMA登録済み」(青)になり、一覧のRMA列に番号が入っている',
+    cautions: ['備考「スワップ禁止」を忘れると別個体が返ってきてナンバリングが崩れる'],
+  },
+  '発送済み': {
+    title: '箱詰めして発送',
+    actions: ['発送する機器を一覧で複数選択する', '下の一括バーで「発送済み」を押す', '「Shipping Manifest印刷」を押す', '印刷ダイアログで印刷する', 'Manifest を箱に同梱する', 'ヤマト発払い伝票を手書きする', '伝票番号をこのツールに入力する', '「一括保存」を押す', 'Slack共有文を「コピー」する', '#dej6-it-poc に貼り付ける', '投稿する'],
+    done: 'ステータスが「発送済み」(紫)。Manifest が箱に入っている。Slackに投稿済み',
+    cautions: ['Manifest の返送先住所(DEJ6)を必ず確認', '膨張バッテリーは発送禁止'],
+  },
+  '返却済み': {
+    title: '返却品を受け取る',
+    actions: ['箱を開ける', '台数を Manifest / RMA と照合する', 'シリアルを Manifest / RMA と照合する', 'このツールで機器をタップする', '「返却済み」を押す', '返却日を入力する', '備考(交換品か修理品か)を入力する', '「保存する」を押す', 'Slack共有文を「コピー」する', '#dej6-it-poc に貼り付ける', '投稿する'],
+    done: 'ステータスが「返却済み」(水色。一覧では「返却済み・要設定」と表示)になっている',
+    cautions: ['シリアルが変わっていたら(交換品)モーダルのシリアル欄を書き換える'],
+  },
+  '正常': {
+    title: '設定して現場へ戻す',
+    actions: ['ナンバリング(機器ID)のシールを貼る/貼り直す', '下の「C. 復帰チェック」を上から確認する', 'このツールで機器をタップする', '「正常」を押す', '「保存する」を押す'],
+    done: 'ステータスが「正常」(緑)。修理関連データ(RMA/不具合/伝票)が自動でクリアされる',
+    cautions: [],
+  },
+}
+
+const GUIDE_DATA = {
+  SSP: {
+    model: 'Zebra TC57 (スキャンタブレット)', who: '修理待ち登録=気付いた人(AA/SA) / SIM以降=SA・IT POC',
+    first_aid: [
+      '電源ボタン長押しで再起動 → 画面乱れ・異常ビープ・アプリ不調はこれで直ることが多い',
+      '充電できない → 充電端子を乾いた布/エアダスターで清掃、バッテリーを一度外して確実に装着',
+      '別のクレードルに載せ替える → 充電できればクレードル側の不良(本体は正常)',
+      'Utility と Velocity のアイコンがあり起動するか確認 → 無ければ再設定が必要(故障ではない)',
+      'スキャンできない → スキャン窓を清掃、読み取り距離(0〜20cm)と明るさを変えて再試行',
+    ],
+    step_extra: {
+      '修理待ち': { replace: true, actions: ['qr-app(SSP管理ツール)で故障登録する', '機器の番号(機器ID)を確認する', '下流の SSP専用回収Box へ入れる'],
+        cautions: ['qr-app の故障登録は30分以内に自動でこのツールの「修理待ち」になる(手動登録は不要)', 'qr-app が使えない時だけ、下の「qr-app が使えない時」の手順で登録する', '膨張・破損したバッテリーは回収Boxに入れない(サイト内e-wasteルールで廃棄)'],
+        fallback: { title: 'qr-app が使えない時', actions: ['このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す'] } },
+      '発送済み': { cautions: ['RMA番号が無いと Zebra が受け付けない。先に RMA登録 を済ませる'] },
+    },
+    return_check: ['充電が始まる', 'Utility / Velocity が起動する', 'スキャン音とビームが出る', 'qr-app の故障登録を解除する(brokenのまま残すと再同期で修理待ちに戻る)'],
+    links: [ { label: 'SSP 点検SOP(AA向け・使える/使えないの判定)', url: null, note: '共有先URL確認中' } ],
+  },
+  FS: {
+    model: 'Zebra RS5100 (フィンガースキャナー / ホスト=TC57)', who: '修理待ち登録=気付いた人 / RMA以降=SA・IT POC',
+    first_aid: [
+      '充電できない → 端子清掃、バッテリーを奥まで装着し直す、別のクレードルで試す',
+      'ビームが途切れる → TC57にペアリングした状態で軽く振りながらトリガー。途切れるなら端子清掃→再装着、直らなければ故障',
+      'ペアリングできない → TC57側を再起動してから再ペアリング',
+      '紐(ストラップ)のほつれ・シリコンの裂けは修理対象(作業中の脱落リスク)',
+    ],
+    step_extra: {
+      '修理待ち': { replace: true, actions: ['機器の番号(機器ID)を確認する', 'このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す', '下流の FS専用回収Box へ入れる'],
+        cautions: ['膨張・破損したバッテリーは回収Boxに入れない(サイト内e-wasteルールで廃棄)'] },
+      'RMA登録済み': { cautions: ['FS は SIM 不要。修理待ちから直接 RMA 登録に進む(Wiki確認済み)'] },
+    },
+    return_check: ['充電ランプが点く', 'TC57とペアリングでき、振ってもビームが出続ける', '紐・シリコンに損傷がない'],
+    links: [ { label: 'FS 点検SOP(AA向け)', url: null, note: '共有先URL確認中' } ],
+  },
+  ZD611: {
+    model: 'Zebra ZD611 (ラベルプリンター)', who: '修理待ち登録=気付いた人 / SIM以降=SA(全員可)・IT POC',
+    first_aid: [
+      '印字が薄い・かすれる → プリントヘッドをクリーニングペン(またはアルコール綿棒)で清掃し、ラベルロールの向きと残量を確認',
+      'ラベル位置がずれる・1枚飛ばす → メディアキャリブレーション(フィードボタン長押し)を実行',
+      '設定を確認: 印字速度 101 / 印字濃度 5(既定 203 / 15 から下げる。ヘッド焼き付きが減り修理頻度が下がった DEJ6 の実績設定)',
+      'SSPと繋がらない → Bluetooth ペアリングをやり直す(USB接続は誘導のみ)',
+      'ヘッドに白い焼き付き(印字の白抜け)が出ていたら清掃では直らない → 修理へ',
+    ],
+    step_extra: {
+      '修理待ち': { replace: true, actions: ['番号札(No.)を確認する', 'このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す', '修理中ゾーンの定位置に置く(カートに戻さない)'],
+        cautions: ['カートに載せたままにしない(カートが移動すると所在が分からなくなる)'] },
+    },
+    return_check: ['テスト印字が全面くっきり出る', '印字速度 101 / 濃度 5 に設定', 'ナンバリングシールを貼る', '固定棚の定位置に戻す'],
+    links: [ { label: 'ZD611 PC設定方法(Ito-san SOP)', url: null, note: '共有先URL確認中' } ],
+  },
+  Radio: {
+    model: '業務用無線機 (Kenwood ほか)', who: '修理待ち登録=気付いた人 / SIM以降=SA・IT POC',
+    first_aid: [
+      '電源が入らない・すぐ切れる → 正常な機器のバッテリーと入れ替えて切り分け(バッテリー側なら本体は正常)',
+      '充電できない → 充電器の別スロット/別の充電器で試す',
+      '聞こえない・届かない → アンテナの緩み、チャンネル・ボリューム設定を確認',
+    ],
+    step_extra: {
+      '発送済み': { cautions: ['送付先は TYO4 青梅FC IT担当者宛(Zebraではない)。SIM で別の指示があればそれに従う', '無線機は RMA なし。SIM起票 → 発送に進む'] },
+    },
+    return_check: ['電源・充電・送受信ができる', 'チャンネル設定が DEJ6 用になっている', 'ナンバリングシールを貼る'],
+    links: [],
+  },
+  Avery: {
+    model: 'Avery ラベルプリンター', who: 'SA・IT POC',
+    dest: 'Wiki「Avery修理依頼方法」の指示に従う', hide_addr: true, sim_label: 'SIM 不要(Wiki手順で依頼)', sim_link_label: 'JP-OTS QuickLink(Wiki)を開く',
+    first_aid: [
+      'ラベル位置がずれる → キャリブレーションツールで調整する',
+      '印字が薄い → ラベルロールの向き・残量を確認し、ヘッドを清掃する',
+      '動かない → 電源を入れ直し、ラベルを再セットしてカバーを確実に閉める',
+    ],
+    step_extra: {
+      'SIM起票済み': { replace: true, title: 'Wiki の手順で修理依頼(ツール上の表示は「SIM起票済み」)',
+        actions: ['JP-OTS QuickLink(Wiki)を開く(下のリンク)', 'ページ内の「Avery修理依頼方法」を開く', 'Wiki の Trouble Shooting を上から実施する', '直らなければ Wiki の手順どおり修理依頼をする', 'このツールで機器をタップする', '「SIM起票済み」を押す', 'SIM URL欄に Wiki「Avery修理依頼方法」ページのURLを貼る', '「保存する」を押す'],
+        done: 'ステータスが「SIM起票済み」(橙)になっている(Averyでは「修理依頼済み」の意味)',
+        cautions: ['Avery の物理故障は SIM チケット不要(Wiki の手順で依頼する)'] },
+      '発送済み': { cautions: ['送付先は Wiki の修理依頼手順で指示された宛先(Zebra/TYO4ではない)'] },
+    },
+    return_check: ['テスト印字が出る', 'ナンバリングシールを貼る'],
+    links: [],
+  },
+  Handy: {
+    model: 'ハンディ端末', who: 'SA・IT POC',
+    dest: 'SIM で指示された宛先(既定は TYO4 青梅FC IT担当者宛)',
+    first_aid: ['再起動する(画面が固まっていれば電源長押し10秒で強制再起動)', '充電端子を清掃し、別の充電器で切り分ける', 'ネットワーク不良は Wi-Fi を切って再接続する'],
+    step_extra: { '発送済み': { cautions: ['送付先は SIM で指示された宛先を優先する(TYO4 の住所は既定値)'] } },
+    return_check: ['起動・充電・スキャンができる'],
+    links: [],
+  },
+  PC: {
+    model: 'PC / タブレット', who: 'SA・IT POC',
+    dest: 'SIM で指示された宛先(既定は TYO4 青梅FC IT担当者宛)',
+    first_aid: ['再起動する', 'ACアダプタ・ケーブルを交換して切り分ける', 'ネットワーク不良は Wi-Fi 再接続を先に試す'],
+    step_extra: {
+      'SIM起票済み': { replace: true, actions: ['JP-OTS QuickLink(Wiki)を開く(下のリンク)', 'ページ内の PC 依頼テンプレートを開く', '機器ID・シリアル・症状を入力する', '起票する', '起票できたSIMのURLをこのツールの「SIM URL」欄に貼る', '「保存する」を押す'],
+        cautions: ['PC 用の SIM 自動生成文は無いので、機器IDとシリアルを手で書く'] },
+      '発送済み': { cautions: ['送付先は SIM で指示された宛先を優先する(TYO4 の住所は既定値)'] },
+    },
+    return_check: ['起動・ログインができる'],
+    links: [],
+  },
+  Mobile: {
+    model: '携帯(スマートフォン)', who: 'SA・IT POC',
+    dest: 'SIM で指示された宛先(既定は TYO4 青梅FC IT担当者宛)',
+    first_aid: ['再起動する', '充電ケーブルを交換して切り分ける', 'SIMカードを抜き差しする'],
+    step_extra: { '発送済み': { cautions: ['送付先は SIM で指示された宛先を優先する(TYO4 の住所は既定値)'] } },
+    return_check: ['起動・通話・充電ができる'],
+    links: [],
+  },
+  // 未知の device_type はここに正規化する(表示「その他」・汎用フロー)
+  Other: {
+    model: 'その他のIT機器(上の8機種に当てはまらないもの)', who: 'SA・IT POC',
+    dest: 'SIM で指示された宛先(既定は TYO4 青梅FC IT担当者宛)',
+    first_aid: ['電源を入れ直す', '電源ケーブル・充電器を別のものに替えて切り分ける', '同じ機種の正常品と入れ替えて症状が再現するか確かめる'],
+    step_extra: {
+      'SIM起票済み': { replace: true, actions: ['JP-OTS QuickLink(Wiki)を開く(下のリンク)', 'ページ内の該当機器の依頼テンプレートを開く', '機器ID・シリアル・症状を入力する', '起票する', '起票できたSIMのURLをこのツールの「SIM URL」欄に貼る', '「保存する」を押す'] },
+      '発送済み': { cautions: ['送付先は SIM で指示された宛先(既定は TYO4 青梅FC IT担当者宛)'] },
+    },
+    return_check: ['電源が入り、本来の用途で動作する', 'ナンバリングシールを貼る'],
+    links: [],
+  },
+}
 
 // ─── 状態 ─────────────────────────────────────────
 let allDevices = [], fbItems = {}, appCfg = {}, currentDevice = null
@@ -497,6 +711,8 @@ async function loadAll() {
     fbItems = fb || {}
     setDbStatus('接続済み', 'success')
     refreshUI()
+    // 修理手順ガイドが表示中なら再描画(ディープリンク起動時は appCfg 読込前に開くので、住所をここで反映する)
+    if (document.querySelector('#guideModal.show')) guideRender(guideState.type, guideState.current)
   } catch(e) {
     setDbStatus('接続エラー', 'danger')
     document.getElementById('deviceBody').innerHTML =
@@ -758,12 +974,12 @@ window.openStatus = id => {
   ;['mSerialInput','mAssetInput','mMemoInput'].forEach(i=>document.getElementById(i).disabled = !ed)
   document.getElementById('saveBtn').style.display = ed ? '' : 'none'
   // フロー順のステータスボタン
-  const flow = (FLOWS[d.device_type] || ['修理待ち','SIM起票済み','発送済み','返却済み','正常'])
+  const flow = (FLOWS[d.device_type] || GUIDE_DEFAULT_FLOW)
   document.getElementById('statusBtns').innerHTML = ed
     ? flow.map(s => `<button class="btn btn-sm ${s===d.status?'btn-secondary disabled':'btn-outline-dark'}"
         onclick="selectStatus('${s}')"><span class="status-badge status-${s}">${s}</span></button>`).join('')
     : `<span class="text-muted small">閲覧モードのため変更不可。右上「編集モード」からログインしてください。</span>`
-  new bootstrap.Modal(document.getElementById('statusModal')).show()
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('statusModal')).show()   // v2.1: 修理手順ガイドが getInstance で同じインスタンスを扱うため new しない
 }
 window.checkDirty = () => {
   const d = currentDevice; if (!d || !isEditor()) return
@@ -1182,9 +1398,130 @@ window.saveConfig = async () => {
 }
 window.openSOP = () => new bootstrap.Modal(document.getElementById('sopModal')).show()
 
+// ─── 修理手順ガイド v2.1: 描画 ───────────────────────
+const guideState = { type:'SSP', current:null }
+const GUIDE_ICONS = { 'bi-ticket-detailed':'bi-ticket-detailed', 'bi-book':'bi-book', 'bi-box-arrow-up-right':'bi-box-arrow-up-right', 'bi-slack':'bi-slack' }
+function guideSafeUrl(u){ return /^https:\/\//.test(String(u||'')) ? u : '#' }
+function guideDeepLink(type){ const u = new URL(location.href); u.search = ''; u.searchParams.set('guide', type); return u.toString() }
+window.guideCopyUrl = function(){ navigator.clipboard.writeText(guideDeepLink(guideState.type)).then(()=>toast('この機種の手順URLをコピーしました 📋')) }
+window.guidePrint = function(){
+  const body = document.getElementById('guideBody').innerHTML
+  const w = window.open('', '_blank')
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>修理手順 ${esc(typeName(guideState.type))} DEJ6</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <style>${[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n')} body{background:#fff;margin:0;font-size:10pt;line-height:1.35} .guide-links,.btn{display:none!important} .guide-step{padding:.5rem .75rem!important;margin-bottom:.4rem!important} ol.actions li{margin-bottom:0!important} .guide-step,.guide-summary{break-inside:avoid;page-break-inside:avoid} h6{break-after:avoid} @page{size:A4 portrait;margin:12mm}</style></head>
+    <body><h4 class="fw-bold mb-2">DEJ6 修理手順 — ${esc(typeName(guideState.type))} <small class="text-muted">${new Date().toLocaleDateString('ja-JP')}</small></h4>${body}<script>window.onload=()=>window.print()<\/script></body></html>`)
+  w.document.close()
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-guide-type]'); if (!a) return
+  e.preventDefault(); const t = a.dataset.guideType
+  if (Object.prototype.hasOwnProperty.call(GUIDE_DATA, t)) guideRender(t, null)
+})
+function guideLinksFor(type, status) {
+  const L = []
+  if (status === 'SIM起票済み' && SIM_TEMPLATES[type]) L.push({ icon:'bi-ticket-detailed', label:`${typeName(type)} SIMテンプレートを開く`, url: SIM_TEMPLATES[type] })
+  if (status === 'SIM起票済み' && !SIM_TEMPLATES[type]) L.push({ icon:'bi-book', label:(GUIDE_DATA[type]||{}).sim_link_label || 'JP-OTS QuickLink(Wiki)でテンプレを探す', url: GUIDE_URL_WIKI })
+  if (status === 'RMA登録済み') L.push({ icon:'bi-box-arrow-up-right', label:'Zebra 修理ポータル', url: GUIDE_URL_ZEBRA })
+  if (status === '発送済み' || status === '返却済み') L.push({ icon:'bi-slack', label:'#dej6-it-poc に投稿', url: GUIDE_URL_SLACK })
+  return L
+}
+window.guideRender = function(type, current) {
+  guideState.type = type; guideState.current = current
+  const g = GUIDE_DATA[type] || GUIDE_DATA.Other
+  const flow = FLOWS[type] || GUIDE_DEFAULT_FLOW
+  const sim = flow.includes('SIM起票済み'), rma = flow.includes('RMA登録済み')
+  const zebra = ZEBRA_TYPES.includes(type)
+  const dest = g.dest || (zebra ? 'Zebra社 (Direct RMA)' : 'TYO4 青梅FC IT担当者宛')
+  const addr = g.hide_addr ? '' : ((zebra ? appCfg['addr_zebra'] : appCfg['addr_tyo4']) || '(住所はマスタ設定で登録してください)')
+  document.getElementById('guideTabs').innerHTML = Object.keys(GUIDE_DATA).map(t =>
+    `<li class="nav-item"><a class="nav-link ${t===type?'active':''}" href="#" data-guide-type="${esc(t)}">${esc(typeName(t))}</a></li>`).join('')
+  const steps = flow.map((s, i) => {
+    const base = GUIDE_STEP_BASE[s] || {}, ex = (g.step_extra||{})[s] || {}
+    // replace:true = 共通 actions/cautions を丸ごと置換(追記モードは無い) / cautions だけの step_extra は共通に追記
+    const actions  = ex.replace ? (ex.actions||[]) : (base.actions||[])
+    const cautions = ex.replace ? (ex.cautions||[]) : [...(base.cautions||[]), ...(ex.cautions||[])]
+    const links = guideLinksFor(type, s)
+    const cur = s === current
+    return `<div class="guide-step p-3 mb-2 ${cur?'current':''}">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span class="step-no">${i+1}</span>
+        <span class="status-badge status-${esc(s)}">${esc(s)}</span>
+        <span class="fw-bold">${esc(ex.title || base.title || s)}</span>
+        ${cur?'<span class="here-badge ms-1"><i class="bi bi-geo-alt-fill me-1"></i>いまここ</span>':''}
+      </div>
+      <ol class="actions small">${actions.map(a=>`<li>${esc(a)}</li>`).join('')}</ol>
+      ${ex.fallback?`<div class="small fw-semibold mt-1"><i class="bi bi-signpost me-1"></i>${esc(ex.fallback.title)}</div><ol class="actions small">${(ex.fallback.actions||[]).map(a=>`<li>${esc(a)}</li>`).join('')}</ol>`:''}
+      ${(ex.done||base.done)?`<div class="guide-done mb-1"><i class="bi bi-check-circle-fill me-1"></i><strong>完了のサイン:</strong> ${esc(ex.done||base.done)}</div>`:''}
+      ${cautions.length?`<div class="guide-caution mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>${cautions.map(esc).join(' ／ ')}</div>`:''}
+      ${links.length?`<div class="guide-links d-flex flex-wrap gap-2 mt-2">${links.map(l=>`<a class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" href="${esc(guideSafeUrl(l.url))}"><i class="bi ${GUIDE_ICONS[l.icon]||'bi-link-45deg'} me-1"></i>${esc(l.label)}</a>`).join('')}</div>`:''}
+    </div>`
+  }).join('')
+  document.getElementById('guideBody').innerHTML = `
+    <div class="guide-summary p-3 mb-3">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <span class="type-badge type-${esc(type)} fs-6">${esc(typeName(type))}</span>
+        <span class="fw-bold">${esc(g.model)}</span>
+        <span class="badge ${sim&&!g.sim_label?'bg-warning text-dark':'bg-secondary'}">${esc(g.sim_label || ('SIM '+(sim?'必要':'不要')))}</span>
+        <span class="badge ${rma?'bg-primary':'bg-secondary'}">RMA ${rma?'必要(Zebra)':'なし'}</span>
+        <span class="badge bg-dark"><i class="bi bi-truck me-1"></i>送付先: ${esc(dest)}</span>
+      </div>
+      <div class="guide-flow d-flex flex-wrap align-items-center gap-1 mb-2">
+        ${flow.map((s,i)=>`<span class="status-badge status-${esc(s)}">${esc(s)}</span>${i<flow.length-1?'<i class="bi bi-arrow-right"></i>':''}`).join('')}
+      </div>
+      <div class="small text-muted"><i class="bi bi-people me-1"></i>${esc(g.who)}${addr?` ／ <i class="bi bi-geo me-1"></i>${esc(addr)}`:''}</div>
+    </div>
+    <h6 class="fw-bold"><i class="bi bi-lightning-charge text-warning me-1"></i>A. 修理に出す前に試す(5分) <small class="text-muted fw-normal">直ったら「正常」に戻して終わり</small></h6>
+    <ul class="first-aid small mb-3">${g.first_aid.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>
+    <h6 class="fw-bold"><i class="bi bi-signpost-split text-primary me-1"></i>B. 修理フロー <small class="text-muted fw-normal">1ステップずつ。上から順に</small></h6>
+    ${steps}
+    <h6 class="fw-bold mt-3"><i class="bi bi-clipboard-check text-success me-1"></i>C. 復帰チェック(「正常」に戻す前に)</h6>
+    <ul class="small mb-3">${g.return_check.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>
+    <h6 class="fw-bold"><i class="bi bi-link-45deg me-1"></i>D. リンク集</h6>
+    <div class="guide-links d-flex flex-wrap gap-2 mb-3">
+      ${SIM_TEMPLATES[type]?`<a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="${esc(guideSafeUrl(SIM_TEMPLATES[type]))}"><i class="bi bi-ticket-detailed me-1"></i>SIMテンプレート</a>`:''}
+      ${zebra?`<a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="${esc(guideSafeUrl(GUIDE_URL_ZEBRA))}"><i class="bi bi-box-arrow-up-right me-1"></i>Zebra修理ポータル</a>`:''}
+      <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="${esc(guideSafeUrl(GUIDE_URL_WIKI))}"><i class="bi bi-book me-1"></i>JP-OTS QuickLink(Wiki・手順の正)</a>
+      <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="${esc(guideSafeUrl(GUIDE_URL_SLACK))}"><i class="bi bi-slack me-1"></i>#dej6-it-poc</a>
+      ${g.links.map(l=> l.url ? `<a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="${esc(guideSafeUrl(l.url))}"><i class="bi bi-file-earmark-slides me-1"></i>${esc(l.label)}</a>` : `<span class="btn btn-sm btn-outline-secondary disabled">${esc(l.label)} <small>(${esc(l.note)})</small></span>`).join('')}
+    </div>
+    <h6 class="fw-bold"><i class="bi bi-exclamation-triangle text-danger me-1"></i>E. 発送の鉄則(全機種)</h6>
+    <div class="alert alert-warning small mb-2"> ① Shipping Manifest を必ず同梱 ② 返送先住所を確認 ③ Zebra 備考に「スワップ禁止」 ④ 膨張・破損バッテリーは発送禁止(サイト内e-wasteで廃棄)</div>
+    <p class="small text-muted mb-0">出典: JP-OTS QuickLink Wiki(2026-07-25確認)・#dej6-it-poc 運用実績。手順の訂正・追加は #dej6-it-poc へ。</p>`
+}
+window.guideOpen = function(type, current) {
+  if (!Object.prototype.hasOwnProperty.call(GUIDE_DATA, type)) type = 'Other'   // 未知の機種は「その他」(汎用フロー・汎用手順)
+  const flow = FLOWS[type] || GUIDE_DEFAULT_FLOW
+  guideRender(type, flow.includes(current) ? current : null)
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('guideModal')).show()   // 開くたびに new しない(keydown 等のリスナーが重複しないように)
+}
+// ステータス更新モーダルから: その機器の機種と現在ステータスで開く(「いまここ」付き)。
+// Bootstrap は多重モーダルを想定しない(重ねると Esc が下のモーダルを閉じる)ので、statusModal は一旦隠し、ガイドを閉じたら同じ状態で再表示する(入力中の値は保持)
+let guideReturnToStatus = false
+let guideStatusFading = false   // statusModal がフェードイン中か(Bootstrap は遷移中の hide() を無視するので、その間の押下は表示完了後にやり直す)
+document.getElementById('statusModal').addEventListener('show.bs.modal', () => { guideStatusFading = true })
+document.getElementById('statusModal').addEventListener('shown.bs.modal', () => { guideStatusFading = false })
+window.guideOpenFromStatus = () => {
+  if (!currentDevice) return
+  const el = document.getElementById('statusModal'), sm = bootstrap.Modal.getInstance(el)
+  const open = () => guideOpen(currentDevice.device_type, LEGACY[currentDevice.status] || currentDevice.status)
+  if (!sm || !el.classList.contains('show')) { open(); return }
+  if (guideStatusFading) { el.addEventListener('shown.bs.modal', () => window.guideOpenFromStatus(), { once: true }); return }   // 表示直後の速いタップ対策
+  guideReturnToStatus = true
+  el.addEventListener('hidden.bs.modal', open, { once: true })   // フェードアウト完了後に開く(同時に開くとフォーカスが外れ Esc が効かない)
+  sm.hide()
+}
+document.getElementById('guideModal').addEventListener('hidden.bs.modal', () => {
+  if (!guideReturnToStatus) return
+  guideReturnToStatus = false
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('statusModal')).show()
+})
+
+
 // ─── 起動 ─────────────────────────────────────────
 applyEditorUI()
-loadAll()
+// ディープリンク ?guide=<機種>: 初回ロード完了後(失敗時も)に開く。appCfg の住所を初回描画から反映するため loadAll を待つ
+loadAll().finally(() => { const q = new URL(location.href).searchParams; if (q.has('guide')) guideOpen(q.get('guide'), null) })
 // 5分毎に自動リフレッシュ(現場で開きっぱなし運用を想定)
 setInterval(loadAll, 300000)
 </script>

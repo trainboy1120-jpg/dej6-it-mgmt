@@ -1,0 +1,8 @@
+# xreview report (2026-09-12 01:25)
+
+**Final: PASS**
+
+Spec: 対象は DEJ6 IT機器管理アプリ(index.html 単一ファイル・Bootstrap5・Supabase REST)へ『機種別 修理手順ガイド』を追加するための設計プラン(docs/repair_guide_plan.md)、UI モック(docs/mockup/repair_guide_mockup.html)、ガイド本文データ(docs/mockup/repair_guides.js)、識別子衝突チェック(docs/mockup/check_identifiers.py)、1行1操作チェッカー(docs/mockup/check_one_action.py)。r1〜r13 の指摘は修正済み。r13 対応: check_one_action.py は actions 配列にシングルクォート以外のリテラル・変数が残っていたら rc=2(検査不能)で止まる(ダブルクォートを含む負例で rc=2 を実測) / ディープリンクは has('guide') で判定し、空文字・不正値は Other へ正規化、パラメータ無しは開かない(モックは無い時だけデモ用に SSP を開く)。Playwright で ?guide= → その他 / %3Cscript%3E → その他 / ZD611 → ZD611 を実測。目的: 初めてのSA/AAが1人で機器の一次対処→修理フロー→復帰までできる手順とリンクを既存アプリ内に見せる。レビュー観点: (1)プランの論理的な穴・矛盾 (2)手順本文が『1行1操作/完了のサイン/注意/リンク』で FLOWS のステータス名と整合 (3)描画コードが動的値を esc()/guideSafeUrl/ホワイトリストで扱っているか、index.html 移植時の衝突 (4)現場で誤解を生む表現。blocking = blocker または major。仕様どおりで指摘対象外: index.html 本体はレビュー対象に含めず衝突確認は check_identifiers.py の添付結果で受容/印刷は 2〜3枚で受容/ガイド本文はコード内定数(DB化・編集UIは対象外)/写真・動画は対象外/未検証Wiki下位URLは載せない/モックは単体ページで Supabase 接続なし・パラメータ無しで SSP を開くのはモック専用の挙動/appCfg 住所はダミー/Slack URL は workspace 直リンク/静的文字列のみの onclick は許容/Avery は FLOWS 上「SIM起票済み」を通過するのがツールの制約で『ツール上の表示』と明示して受容/first_aid は運用上の下限3件/モックの alert() は実装で toast() に置換/print は別ウィンドウ document.write 方式を受容/1操作の行に括弧書きの補足が付くのは受容(括弧内は機械チェック対象外)/対象が複数でも操作が1つなら1行1操作として受容/first_aid と cautions は説明文で 1行1操作規則の対象外/1行1操作の判定は check_one_action.py の規則を正とし、その規則を通過した行の分割要求は対象外/チェッカーは正規表現ベースの静的検査で JS パーサではない(ネストした配列やコメント内の actions は対象外)/Other は FLOWS に無いため GUIDE_DEFAULT_FLOW を使う設計/本文の事実は確認済みで真偽は対象外。
+
+## Round 1: reviewer=openai.gpt-5.6-sol verdict=PASS
+対象5ファイルを仕様およびr13対応内容に照らして確認した。ディープリンクの空値・不正値のOther正規化、動的値のエスケープとURL検証、識別子衝突チェック、1行1操作チェッカーの検査不能時rc=2はいずれも設計・コード上で整合している。blockerまたはmajorに該当する未解決事項は見当たらない。
