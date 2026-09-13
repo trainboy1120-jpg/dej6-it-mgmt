@@ -559,7 +559,7 @@ const SCAN_MODE = new URL(location.href).searchParams.get('mode') === 'scan'
 const SCAN_TIMEOUT_DEFAULT_MS = 15000   // 端末QR の後に FAULT を待つ時間(旧 qr-app と同じ 15秒)。app_config.scan_timeout_ms で上書き可(テスト用)
 // 編集PINのSHA-256ハッシュ(salt付き)。PIN本体は #dej6-it-poc で共有
 const PIN_SALT = 'dej6-it-mgmt::'
-const PIN_HASH = '3198679d1cdbf56cb76b56a1369a126aea6fb97b599d70659d57e14e713d3820'
+const PIN_HASH = 'a315f7b495dda331ee3a9aba885fd2ab21f7e2904180c4a0175b5d56c55268a4'
 
 // ─── 機種別フロー定義(JP-OTS Wiki 2026-07確認) ────────
 const FLOWS = {
