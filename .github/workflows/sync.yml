@@ -1,8 +1,8 @@
-name: qr-app sync (30min)
+name: qr-app sync (manual only; v2.2 で定期実行を停止)
 
+# v2.2 (2026-09): Firebase(qr-app) の参照を止めたため cron は削除。履歴・手動実行(workflow_dispatch)のみ残す。
+# 再び自動同期が必要になった場合だけ schedule を戻すこと(その前に README の v2.2 節を読む)。
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # 60日無活動によるcron自動停止を防ぐハートビートcommit用
+  contents: read
 
 jobs:
   sync:
@@ -20,34 +20,3 @@ jobs:
 
       - name: Run sync
         run: python3 scripts/sync.py
-
-      # qr-app本体のSupabase(uaxyskjcvfpzuobfcynx)はsync.pyでは一切触らないため、
-      # ここで専用keep-aliveを行う(HTTP 401でも「到達=活動」扱いで停止を防げる)。
-      # code=000は DNS不達=一時停止の疑い → わざと失敗させてメール通知で気付く。
-      # if: always() でsync.pyが失敗してもkeep-aliveだけは必ず走らせる。
-      - name: Keep-alive qr-app Supabase (uaxyskjcvfpzuobfcynx)
-        if: always()
-        run: |
-          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 https://uaxyskjcvfpzuobfcynx.supabase.co/rest/v1/)
-          echo "qr-app supabase http=$code"
-          if [ "$code" = "000" ]; then
-            echo "::error::qr-app Supabaseに到達できません(一時停止の疑い)。supabase.com/dashboard/project/uaxyskjcvfpzuobfcynx でRESUMEしてください"
-            exit 1
-          fi
-
-      # GitHubは60日commitがないリポジトリのscheduleを自動無効化する。
-      # 最終commitから25日以上経っていたらハートビートcommitを積んで延命する。
-      - name: Heartbeat commit (keep schedules alive)
-        run: |
-          last=$(git log -1 --format=%ct)
-          now=$(date +%s)
-          age_days=$(( (now - last) / 86400 ))
-          echo "last commit ${age_days} days ago"
-          if [ "$age_days" -ge 25 ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            date -u +%Y-%m-%dT%H:%M:%SZ > .heartbeat
-            git add .heartbeat
-            git commit -m "chore: heartbeat (keep scheduled workflows alive)"
-            git push
-          fi

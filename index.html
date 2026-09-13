@@ -72,12 +72,24 @@ body { background:#f0f4f8; font-size:.9rem; }
 .first-aid li { margin-bottom:.25rem; }
 .here-badge { background:#198754; color:#fff; font-size:.68rem; padding:.18em .55em; border-radius:10px; font-weight:700; }
 @media (max-width:767px){ .guide-step{font-size:.85rem} }
+/* v2.2 */
+.hold-badge { background:#e2e3e5; color:#41464b; font-size:.68rem; padding:.18em .5em; border-radius:10px; font-weight:700; }
+.fault-badge { font-size:.66rem; padding:.15em .45em; border-radius:8px; font-weight:700; background:#fff3cd; color:#7a5700; }
+.fault-badge.bad { background:#f8d7da; color:#842029; }
+#fsPanel .big { font-size:1.7rem; font-weight:800; line-height:1.1; }
+body.scan-mode { background:#0f172a; color:#fff; }
+#scanPanel .scan-stage { border-radius:14px; min-height:300px; padding:1.6rem; text-align:center; transition:background .2s; }
+#scanPanel .stage-idle { background:#1e293b; } #scanPanel .stage-wait { background:#facc15; color:#1e293b; }
+#scanPanel .stage-ok { background:#16a34a; } #scanPanel .stage-warn { background:#d97706; } #scanPanel .stage-err { background:#dc2626; }
+#scanPanel .scan-title { font-size:2.2rem; font-weight:800; }
+#scanPanel table { font-size:.85rem; }
+#invTable td { vertical-align:middle; }
 </style>
 </head>
 <body>
 <nav class="navbar navbar-dark py-2" style="background:#1e293b">
   <div class="container-fluid">
-    <span class="navbar-brand fw-bold"><i class="bi bi-hdd-rack me-2 text-info"></i>DEJ6 IT機器管理 <span class="badge bg-info text-dark">v2</span></span>
+    <span class="navbar-brand fw-bold"><i class="bi bi-hdd-rack me-2 text-info"></i>DEJ6 IT機器管理 <span class="badge bg-info text-dark">v2.2</span></span>
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span id="dbStatus" class="badge bg-secondary">接続中...</span>
       <span id="editorBadge" class="badge bg-secondary d-none"></span>
@@ -85,12 +97,14 @@ body { background:#f0f4f8; font-size:.9rem; }
       <button id="logoutBtn" class="btn btn-sm btn-outline-secondary d-none" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
       <button class="btn btn-sm btn-info fw-bold text-dark" onclick="guideOpen(typeFilter==='ALL'?'SSP':typeFilter)"><i class="bi bi-tools me-1"></i>修理手順</button>
       <button class="btn btn-sm btn-outline-info" onclick="openSOP()"><i class="bi bi-question-circle me-1"></i>使い方</button>
+      <button id="invBtn" class="btn btn-sm btn-danger fw-bold d-none" onclick="openInventory()"><i class="bi bi-clipboard-check me-1"></i>棚卸</button>
+      <a id="scanBtn" class="btn btn-sm btn-outline-warning d-none" href="?mode=scan" target="_blank" title="故障BOX前の PC で開く(USBスキャナ)"><i class="bi bi-upc-scan me-1"></i>スキャン受付</a>
       <button id="configBtn" class="btn btn-sm btn-outline-light d-none" onclick="openConfig()"><i class="bi bi-gear"></i></button>
     </div>
   </div>
 </nav>
 
-<div class="container-fluid p-3">
+<div class="container-fluid p-3" id="mainWrap">
 
   <!-- 今日やること -->
   <div class="task-panel p-3 mb-3">
@@ -111,7 +125,7 @@ body { background:#f0f4f8; font-size:.9rem; }
     <div class="col-4 col-sm-2">
       <div class="card stat-card p-2 text-center" style="border-top:3px solid #dc3545" onclick="setStatusChip('修理待ち')">
         <div class="fw-bold fs-4 text-danger" id="cntWait">-</div>
-        <div class="text-muted small">修理待ち</div>
+        <div class="text-muted small">修理待ち<span id="holdNote" class="d-block" style="font-size:.65rem"></span></div>
       </div>
     </div>
     <div class="col-4 col-sm-2">
@@ -139,6 +153,9 @@ body { background:#f0f4f8; font-size:.9rem; }
       </div>
     </div>
   </div>
+
+  <!-- v2.2 FS 数量管理パネル(fs_qty_mode=1 のとき表示) -->
+  <div id="fsPanel" class="card p-3 mb-3 d-none"></div>
 
   <!-- フィルター -->
   <div class="card mb-2 p-2">
@@ -327,12 +344,37 @@ body { background:#f0f4f8; font-size:.9rem; }
             <textarea class="form-control form-control-sm" id="cfgAddrReturn" rows="4"></textarea>
           </div>
           <div class="col-md-3">
-            <label class="form-label fw-semibold small">滞留アラート日数</label>
+            <label class="form-label fw-semibold small">滞留アラート日数(修理待ち・その他)</label>
             <input type="number" class="form-control form-control-sm" id="cfgStagDays" min="1">
           </div>
           <div class="col-md-3">
-            <label class="form-label fw-semibold small">修理待ちアラート閾値(台)</label>
-            <input type="number" class="form-control form-control-sm" id="cfgThreshold" min="1">
+            <label class="form-label fw-semibold small">滞留アラート日数(発送済み)</label>
+            <input type="number" class="form-control form-control-sm" id="cfgStagShipped" min="1">
+          </div>
+          <div class="col-12"><hr class="my-1"><div class="fw-bold small text-secondary">v2.2 運用設定(修理デー・FS・スキャン受付)</div></div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">今月の修理デー(日付をカンマ区切り。棚卸する日は末尾に *)</label>
+            <input type="text" class="form-control form-control-sm" id="cfgRepairDays" placeholder="例: 9/15*, 9/18, 9/22*, 9/25">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">修理担当ローテ(1行1日: 日付 担当)</label>
+            <textarea class="form-control form-control-sm" id="cfgRoster" rows="3" placeholder="9/15 Aさん(日勤)&#10;9/18 Bさん(夜勤)"></textarea>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">FS 数量管理</label>
+            <select class="form-select form-select-sm" id="cfgFsMode"><option value="1">ON(個体行は非表示)</option><option value="0">OFF(従来どおり個体管理)</option></select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">FS 総台数</label>
+            <input type="number" class="form-control form-control-sm" id="cfgFsTotal" min="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">スキャン受付: 区切り文字</label>
+            <select class="form-select form-select-sm" id="cfgScanDelim"><option value="Enter">Enter</option><option value="Tab">Tab</option></select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">スキャン受付: 故障QRの文字列</label>
+            <input type="text" class="form-control form-control-sm" id="cfgScanFault" placeholder="FAULT">
           </div>
         </div>
       </div>
@@ -341,6 +383,68 @@ body { background:#f0f4f8; font-size:.9rem; }
         <button class="btn btn-primary btn-sm px-4" onclick="saveConfig()"><i class="bi bi-check-lg me-1"></i>保存</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- v2.2 棚卸モーダル -->
+<div class="modal fade" id="inventoryModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:#1e293b">
+        <h6 class="modal-title text-white"><i class="bi bi-clipboard-check me-2"></i>棚卸 — 修理依頼品 BOX ⇄ ツール突合 <span class="badge bg-warning text-dark ms-2" id="invHeadInfo"></span></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border small mb-3"><b>やり方:</b> ① BOX(SSP/FS の2箱。初回は上流置き場の「使用不可」棚と廃棄箱も)の中身を全部出す ② 下の一覧で「BOXにある / 無い→保留 / 稼働中→正常」を選ぶ ③ BOXにあるのに一覧に無い端末は「未登録を追加」(その場で修理待ちになる) ④ FS は BOX 内の台数を入力 ⑤「棚卸完了」で保存(履歴に残る。保留は status を変えず内訳から外れる)</div>
+        <div class="fw-bold mb-1">修理待ちの機器(FS 以外) <span class="small text-secondary" id="invCount"></span></div>
+        <table class="table table-sm table-hover align-middle" id="invTable"><thead class="table-light"><tr><th>機器ID</th><th>状態</th><th>滞留</th><th>故障回数</th><th>登録元</th><th style="min-width:420px">BOX 実物</th></tr></thead><tbody id="invBody"></tbody></table>
+        <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+          <div><label class="form-label small mb-0">未登録を追加(BOXにあるが一覧に無い機器ID)</label>
+            <input class="form-control form-control-sm" id="invAddId" list="invAddList" placeholder="例: SSP-045" style="min-width:200px"><datalist id="invAddList"></datalist></div>
+          <button class="btn btn-sm btn-outline-primary" onclick="invAddUnregistered()"><i class="bi bi-plus-lg me-1"></i>追加</button>
+          <div id="invAdded" class="d-flex flex-wrap gap-1"></div>
+        </div>
+        <div id="invFsRow" class="row g-2 align-items-end mb-2" style="max-width:640px">
+          <div class="col"><label class="form-label small mb-0">FS: BOX 内の修理待ち台数</label><input type="number" min="0" class="form-control form-control-sm" id="invFsWait"></div>
+          <div class="col"><label class="form-label small mb-0">発送中(fs_lots)</label><input class="form-control form-control-sm" id="invFsShipping" readonly></div>
+          <div class="col"><label class="form-label small mb-0">総台数</label><input class="form-control form-control-sm" id="invFsTotal" readonly></div>
+          <div class="col"><label class="form-label small mb-0">稼働(自動)</label><input class="form-control form-control-sm fw-bold" id="invFsActive" readonly></div>
+        </div>
+        <div><label class="form-label small mb-0">メモ(任意)</label><input class="form-control form-control-sm" id="invNote" placeholder="例: 上流置き場の使用不可棚に SSP 2台"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <span class="me-auto small" id="invFooter"></span>
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
+        <button class="btn btn-success btn-sm px-4" id="invSaveBtn" onclick="finishInventory()"><i class="bi bi-check-lg me-1"></i>棚卸完了(保存)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- v2.2 スキャン受付(?mode=scan) -->
+<div id="scanPanel" class="container-fluid p-3 d-none">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="fs-4 fw-bold"><i class="bi bi-upc-scan me-2 text-info"></i>スキャン受付 <span class="badge bg-info text-dark">v2.2</span></div>
+    <div class="small text-secondary" id="scanMeta"></div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-7"><div id="scanStage" class="scan-stage stage-idle">
+      <div class="scan-title" id="scanTitle">端末の QR を読んでください</div>
+      <div class="mt-2" id="scanSub" style="font-size:1.05rem">故障登録: 端末QR → FAULT QR ／ 修理から戻った端末: 端末QR だけ</div>
+      <div class="mt-3" id="scanCountdown" style="font-size:1.1rem"></div>
+    </div>
+    <div class="d-flex gap-2 mt-3 small flex-wrap">
+      <div class="p-2 rounded flex-fill text-center" style="background:#1e293b">待機</div>
+      <div class="p-2 rounded flex-fill text-center" style="background:#facc15;color:#1e293b">FAULT 待ち(15秒)</div>
+      <div class="p-2 rounded flex-fill text-center" style="background:#16a34a">登録完了 / 復帰</div>
+      <div class="p-2 rounded flex-fill text-center" style="background:#dc2626">対象外 / 無効なQR</div>
+    </div></div>
+    <div class="col-lg-5"><div class="p-3 rounded-3" style="background:#1e293b">
+      <div class="fw-bold mb-2"><i class="bi bi-clock-history me-1"></i>直近の受付</div>
+      <table class="table table-sm table-dark mb-2"><thead><tr><th>時刻</th><th>読み取り</th><th>結果</th></tr></thead><tbody id="scanRecent"><tr><td colspan="3" class="text-secondary">まだありません</td></tr></tbody></table>
+      <div class="small text-secondary">USB スキャナのキーボード入力を受けます(区切り文字は設定)。FORCERETURN は Phase 3 まで無効。紙のチェックシートは併用してください。</div>
+      <div class="mt-2"><button class="btn btn-sm btn-warning" id="scanLoginBtn" onclick="openLogin()"><i class="bi bi-unlock me-1"></i>PIN でログイン(初回のみ)</button></div>
+    </div></div>
   </div>
 </div>
 
@@ -401,7 +505,7 @@ body { background:#f0f4f8; font-size:.9rem; }
           閲覧は<strong>設定不要</strong>(このURLを開くだけ)。更新するには右上「編集モード」からエイリアス+共有PINでログイン。
         </div>
         <h6 class="fw-bold mt-3"><i class="bi bi-1-circle me-1"></i>故障発生 → 自動で「修理待ち」になる</h6>
-        <p class="small mb-2">SSPはqr-app(SSP管理ツール)で故障登録されると<strong>30分以内に自動でこのツールに反映</strong>されます。FS/ZD611/無線機は一覧から機器をタップして手動で「修理待ち」に。</p>
+        <p class="small mb-2">SSP は故障BOX前の PC「スキャン受付」で 端末QR→FAULT QR を読むと<strong>即「修理待ち」</strong>になります(v2.2)。読めない時は AA はチェックシート+BOX だけで良く、修理担当が棚卸/一覧から手動で登録します。FS/ZD611/無線機は一覧から機器をタップして手動で「修理待ち」に。</p>
         <h6 class="fw-bold mt-3"><i class="bi bi-2-circle me-1"></i>「今日やること」パネルに従う</h6>
         <table class="table table-sm table-bordered small">
           <thead class="table-dark"><tr><th>タスク</th><th>操作</th><th>自動化されること</th></tr></thead>
@@ -409,7 +513,7 @@ body { background:#f0f4f8; font-size:.9rem; }
             <tr><td>SIM起票</td><td>ボタン1つでSIM本文を自動生成→テンプレを開いて貼るだけ</td><td>シリアル/アセット/症状の転記</td></tr>
             <tr><td>Zebra RMA登録</td><td>登録用データ表をコピー→<a href="https://repair.zebra.com/siebel/app/rma/jpn?SWECmd=Login" target="_blank">Zebraポータル</a>に貼る (アカウント: dej6-amzl-rma@amazon.com / 備考に<strong>「スワップ禁止」</strong>必須)</td><td>登録データの整形・英訳</td></tr>
             <tr><td>発送</td><td>一括選択→発送済み→<strong>Shipping Manifest自動印刷</strong>して同梱</td><td>Manifest作成・宛先切替(Zebra社/TYO4)・Slack共有文</td></tr>
-            <tr><td>返却受取</td><td>「返却済み」→設定完了したら「正常」へ</td><td>朝のダイジェストで要設定台数をリマインド</td></tr>
+            <tr><td>返却受取</td><td>「返却済み」→設定完了したら「正常」へ(スキャン受付で端末QRを読むだけでも可)</td><td>「今日やること」に要設定台数を表示</td></tr>
           </tbody>
         </table>
         <h6 class="fw-bold mt-3"><i class="bi bi-3-circle me-1"></i>機種ごとの修理フロー(Wiki準拠)</h6>
@@ -429,7 +533,8 @@ body { background:#f0f4f8; font-size:.9rem; }
         </div>
         <h6 class="fw-bold mt-3"><i class="bi bi-robot me-1"></i>自動で動いているもの</h6>
         <ul class="small">
-          <li>30分毎: qr-app故障登録⇔このツールの同期 (GitHub Actions)</li>
+          <li>スキャン受付(v2.2): USB スキャナで 端末QR→FAULT を読むと「修理待ち」、返却済みの端末を読むと「正常」(旧 qr-app の同期は v2.2 で停止)</li>
+          <li>棚卸(v2.2): 修理デーの1回目に BOX とツールを突合し、保留・未登録・FS 台数を履歴に記録</li>
           <li>毎朝8:00: #dej6-it-poc へダイジェスト投稿 (修理待ち/滞留/実箱との突合)</li>
           <li>ステータス変更はすべて履歴に記録(誰が・いつ・何を)</li>
         </ul>
@@ -449,7 +554,9 @@ body { background:#f0f4f8; font-size:.9rem; }
 // ─── 埋め込み設定(ゼロセットアップ) ──────────────────
 const SB_URL  = 'https://tetigwcotdqgkwfswbyc.supabase.co'
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRldGlnd2NvdGRxZ2t3ZnN3YnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzQxNDgsImV4cCI6MjA5Njg1MDE0OH0.8akyRPHCOX3wfKdIqvoaJdq2D8i--Z1jBLS2RLJOuaQ'
-const FB_URL  = 'https://ssp-rental-default-rtdb.asia-southeast1.firebasedatabase.app'
+// v2.2: 旧 qr-app(Firebase) は参照しない。故障受付は「スキャン受付」(?mode=scan) と棚卸/一覧の手動登録に統一
+const SCAN_MODE = new URL(location.href).searchParams.get('mode') === 'scan'
+const SCAN_TIMEOUT_DEFAULT_MS = 15000   // 端末QR の後に FAULT を待つ時間(旧 qr-app と同じ 15秒)。app_config.scan_timeout_ms で上書き可(テスト用)
 // 編集PINのSHA-256ハッシュ(salt付き)。PIN本体は #dej6-it-poc で共有
 const PIN_SALT = 'dej6-it-mgmt::'
 const PIN_HASH = '3198679d1cdbf56cb76b56a1369a126aea6fb97b599d70659d57e14e713d3820'
@@ -547,12 +654,12 @@ const GUIDE_DATA = {
       'スキャンできない → スキャン窓を清掃、読み取り距離(0〜20cm)と明るさを変えて再試行',
     ],
     step_extra: {
-      '修理待ち': { replace: true, actions: ['qr-app(SSP管理ツール)で故障登録する', '機器の番号(機器ID)を確認する', '下流の SSP専用回収Box へ入れる'],
-        cautions: ['qr-app の故障登録は30分以内に自動でこのツールの「修理待ち」になる(手動登録は不要)', 'qr-app が使えない時だけ、下の「qr-app が使えない時」の手順で登録する', '膨張・破損したバッテリーは回収Boxに入れない(サイト内e-wasteルールで廃棄)'],
-        fallback: { title: 'qr-app が使えない時', actions: ['このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す'] } },
+      '修理待ち': { replace: true, actions: ['チェックシートに ✓ を書く', 'スキャン受付の PC で端末の QR を読む', 'FAULT の QR を読む(15秒以内)', '画面が緑になるのを確認する', '修理依頼品 BOX へ入れる'],
+        cautions: ['端末QR だけ読んで FAULT を読まないと登録されない(15秒で待機に戻る)', 'スキャン受付が無い・動かない時は BOX に入れるだけでよい(修理デーに SA が下の手順で登録する)', '膨張・破損したバッテリーは BOX に入れない(サイト内e-wasteルールで廃棄)'],
+        fallback: { title: 'スキャン受付が使えない時(SA が修理デーに登録)', actions: ['このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す'] } },
       '発送済み': { cautions: ['RMA番号が無いと Zebra が受け付けない。先に RMA登録 を済ませる'] },
     },
-    return_check: ['充電が始まる', 'Utility / Velocity が起動する', 'スキャン音とビームが出る', 'qr-app の故障登録を解除する(brokenのまま残すと再同期で修理待ちに戻る)'],
+    return_check: ['充電が始まる', 'Utility / Velocity が起動する', 'スキャン音とビームが出る', 'スキャン受付で端末の QR を読む(返却済み → 正常 に戻る。読めない時はこのツールで「正常」を押す)'],
     links: [ { label: 'SSP 点検SOP(AA向け・使える/使えないの判定)', url: null, note: '共有先URL確認中' } ],
   },
   FS: {
@@ -661,7 +768,8 @@ const GUIDE_DATA = {
 }
 
 // ─── 状態 ─────────────────────────────────────────
-let allDevices = [], fbItems = {}, appCfg = {}, currentDevice = null
+let allDevices = [], appCfg = {}, currentDevice = null
+let fsLots = [], holdSet = new Set(), invState = null   // v2.2
 let selectedStatus = null, typeFilter = 'ALL', statusFilter = 'ALL'
 let selection = new Set(), bulkTarget = null, bulkDevices = []
 
@@ -693,37 +801,96 @@ async function sbPost(table, body, prefer) {
     method:'POST', headers: sbHeaders(prefer || 'return=minimal'), body: JSON.stringify(body) })
   if (!res.ok) throw new Error(await res.text())
 }
+// v2.2: 任意テーブルの PATCH / RPC
+async function sbPatchTable(table, filter, body) {
+  const res = await fetch(SB_URL + '/rest/v1/' + table + '?' + filter, {
+    method:'PATCH', headers: sbHeaders('return=minimal'), body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(await res.text())
+}
+async function sbRpc(fn, args) {
+  const res = await fetch(SB_URL + '/rest/v1/rpc/' + fn, { method:'POST', headers: sbHeaders(), body: JSON.stringify(args||{}) })
+  const txt = await res.text()
+  if (!res.ok) throw new Error(txt)
+  return txt ? JSON.parse(txt) : null
+}
+async function cfgUpsert(obj) {
+  const rows = Object.entries(obj).map(([key, value]) => ({ key, value: String(value), updated_by: myAlias(), updated_at: new Date().toISOString() }))
+  await sbPost('app_config', rows, 'resolution=merge-duplicates,return=minimal')
+}
+function partialMsg(prefix, e, wrote) {   // v2.2: 先行書込の後で失敗したら「途中まで保存」を明示して再読込を促す
+  return `${prefix}: ${e.message}` + (wrote ? '(途中まで保存された可能性があります。再読み込みして確認してください)' : '')
+}
+function histRow(d, toStatus, extra) {   // repair_history 1行(v2.2: event 列付き)
+  return Object.assign({ device_id: d.device_id, from_status: d.status, to_status: toStatus, handler: myAlias(), note: '', event: null }, extra || {})
+}
 
 // ─── データ読込 ────────────────────────────────────
 async function loadAll() {
   setDbStatus('接続中...', 'warning')
   try {
-    const [dev, cfg, fb] = await Promise.all([
+    const [dev, cfg, lots, holds] = await Promise.all([
       sbGet('devices?select=*&order=device_id'),
-      sbGet('app_config?select=key,value').catch(()=>[]),
-      fetch(FB_URL + '/qr_items.json').then(r=>r.ok?r.json():{}).catch(()=>({})),
+      sbGet('app_config?select=key,value'),
+      sbGet('fs_lots?select=*&order=shipped_at.desc,created_at.desc'),      // v2.2: 失敗は全体エラー(migration_v2_2.sql 未実行なら 404 になる)
+      sbGet('v_hold_latest?select=device_id,event,created_at'),   // v2.2: 端末ごとの最新 hold_open/hold_close(migration_v2_2.sql のビュー)
     ])
+    if (![dev, cfg, lots, holds].every(Array.isArray)) throw new Error('応答が配列ではありません(devices/app_config/fs_lots/v_hold_latest)')
     allDevices = (Array.isArray(dev)?dev:[]).map(d => {
       if (LEGACY[d.status]) d.status = LEGACY[d.status]
       return d
     })
     appCfg = {}; (cfg||[]).forEach(r => appCfg[r.key] = r.value)
-    fbItems = fb || {}
+    fsLots = Array.isArray(lots) ? lots : []
+    holdSet = computeHolds(Array.isArray(holds) ? holds : [])
     setDbStatus('接続済み', 'success')
     refreshUI()
     // 修理手順ガイドが表示中なら再描画(ディープリンク起動時は appCfg 読込前に開くので、住所をここで反映する)
     if (document.querySelector('#guideModal.show')) guideRender(guideState.type, guideState.current)
   } catch(e) {
     setDbStatus('接続エラー', 'danger')
+    document.getElementById('fsPanel').classList.add('d-none')
+    document.getElementById('taskList').innerHTML = '<div class="text-danger small">データ読み込みエラーのため表示できません</div>'
     document.getElementById('deviceBody').innerHTML =
       `<tr><td colspan="10" class="text-center py-4"><div class="alert alert-danger d-inline-block text-start">
         <strong>データ読み込みエラー</strong><br><code>${esc(e.message)}</code><br>
-        <span class="small text-muted">Supabaseが一時停止中の可能性 → 数分後に再読み込みしてください</span><br><br>
+        <span class="small text-muted">Supabaseが一時停止中の可能性 → 数分後に再読み込みしてください。404 で fs_lots / v_hold_latest が出る場合は migration_v2_2.sql が未実行です</span><br><br>
         <button class="btn btn-sm btn-danger" onclick="loadAll()">再試行</button></div></td></tr>`
   }
 }
 function cfgNum(key, def){ const v = parseInt(appCfg[key]); return isNaN(v) ? def : v }
-function refreshUI(){ updateSummary(); renderTasks(); renderTable(); renderBulkBar() }
+function refreshUI(){ updateSummary(); renderTasks(); renderTable(); renderBulkBar(); renderFsPanel(); if (SCAN_MODE) scanRenderMeta() }
+// ─── v2.2 共通 ─────────────────────────────────────
+function computeHolds(rows) {   // 端末ごとに最新の hold_* が hold_open なら「保留中」。status は変えない(planA §2)。入力は v_hold_latest(1端末1行)だが複数行でも最新優先で動く
+  const seen = new Set(), holds = new Set()
+  for (const r of rows) { if (seen.has(r.device_id)) continue; seen.add(r.device_id); if (r.event === 'hold_open') holds.add(r.device_id) }
+  return holds
+}
+function cfgBool(key, def){ const v = appCfg[key]; return v == null || v === '' ? def : (v === '1' || v === 'true' || v === 'ON') }
+function fsMode(){ return cfgBool('fs_qty_mode', false) }
+function todayKey(){ const d = new Date(); return `${d.getMonth()+1}/${d.getDate()}` }
+function todayISO(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+function repairDays(){ return String(appCfg['repair_days']||'').split(/[,\s、]+/).filter(Boolean).map(t => ({ day: t.replace('*',''), inventory: t.includes('*') })) }
+function todayRepair(){ return repairDays().find(r => r.day === todayKey()) || null }
+function rosterFor(day){
+  const line = String(appCfg['repair_roster']||'').split('\n').map(x => x.trim()).find(x => x.startsWith(day + ' ') || x.startsWith(day + '\t') || x === day)
+  return line ? line.slice(day.length).trim() : ''
+}
+function inventoryDoneToday(){ return String(appCfg['last_inventory_date']||'') === todayISO() }
+function stagLimit(d){ return d.status === '発送済み' ? cfgNum('stagnation_days_shipped', 14) : cfgNum('stagnation_days', 7) }
+function faultBadge(d){ const n = parseInt(d.fault_count)||0; return n >= 2 ? `<span class="fault-badge ${n>=3?'bad':''} ms-1" title="故障回数(旧ツールの実績を含む)">故障${n}回</span>` : '' }
+function holdBadge(d){ return holdSet.has(d.device_id) ? '<span class="hold-badge ms-1" title="棚卸で BOX に無かった(所在確認中)">保留</span>' : '' }
+function fsWaitError(wait, total) {   // v2.2: 稼働がマイナスになる台数は保存しない(BOX + 発送中 + 要設定 ≤ 総台数)
+  const t = fsTotals(), tot = total == null ? t.total : total
+  if (isNaN(wait) || wait < 0) return 'BOX 内の台数は 0 以上で入力してください'
+  if (wait + t.shipping + t.setup > tot) return `BOX ${wait} + 発送中 ${t.shipping} + 要設定 ${t.setup} = ${wait + t.shipping + t.setup} が総台数 ${tot} を超えます(稼働がマイナス)。台数を確認してください`
+  return null
+}
+function fsTotals() {   // 5区分: 稼働+修理待ち+発送中+返却済み要設定 = 総台数(発送中・要設定の正本は fs_lots)
+  const total = cfgNum('fs_total', 190), wait = cfgNum('fs_wait', 0)
+  let shipping = 0, setup = 0
+  for (const l of fsLots) { const q = +l.qty||0, r = Math.min(+l.received_qty||0, q), rd = Math.min(+l.ready_qty||0, r); shipping += q - r; setup += r - rd }
+  return { total, wait, shipping, setup, active: total - wait - shipping - setup }
+}
 
 // ─── 共通ユーティリティ ─────────────────────────────
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
@@ -737,18 +904,9 @@ function daysSince(d) {
 function daysBadge(d) {
   if (d.status === '正常') return ''
   const days = daysSince(d); if (days == null || days < 3) return ''
-  const stag = cfgNum('stagnation_days', 14)
-  const cls = days >= stag ? 'days-bad' : (days >= 7 ? 'days-warn' : '')
+  const stag = stagLimit(d)
+  const cls = days >= stag ? 'days-bad' : (days >= Math.ceil(stag/2) ? 'days-warn' : '')
   return cls ? `<span class="days-badge ${cls} ms-1">${days}日</span>` : ''
-}
-function fbBadge(deviceId) {
-  if (!deviceId || !deviceId.startsWith('SSP-')) return ''
-  const fb = fbItems[deviceId.replace('SSP-','').padStart(3,'0')]
-  if (!fb) return ''
-  if (fb.status === 'rented')    return `<span class="fb-rented ms-1">使用中</span>`
-  if (fb.status === 'broken')    return `<span class="fb-broken ms-1">故障登録</span>`
-  if (fb.status === 'available') return `<span class="fb-available ms-1">空き</span>`
-  return ''
 }
 function typeName(t){ return TYPE_LABEL[t] || t }
 function setDbStatus(txt, color) {
@@ -799,13 +957,19 @@ function applyEditorUI() {
   badge.classList.toggle('d-none', !ed)
   if (ed) { badge.className = 'badge bg-warning text-dark'; badge.innerHTML = `<i class="bi bi-pencil-fill me-1"></i>${esc(myAlias())}` }
   document.getElementById('thSelect').style.display = ed ? '' : 'none'
+  document.getElementById('invBtn').classList.toggle('d-none', !ed)
+  document.getElementById('scanBtn').classList.toggle('d-none', !ed)
+  if (SCAN_MODE) { const b = document.getElementById('scanLoginBtn'); if (b) b.classList.toggle('d-none', ed) }
 }
 
 // ─── サマリー ──────────────────────────────────────
 function updateSummary() {
-  const c = s => allDevices.filter(d=>d.status===s).length
-  document.getElementById('cntTotal').textContent    = allDevices.length
-  document.getElementById('cntWait').textContent     = c('修理待ち')
+  const base = fsMode() ? allDevices.filter(d => d.device_type !== 'FS') : allDevices   // v2.2: 数量モードでは FS 個体はサマリーにも数えない(FS パネルが正本)
+  const c = s => base.filter(d=>d.status===s).length
+  document.getElementById('cntTotal').textContent    = base.length
+  const holdN = base.filter(d => d.status === '修理待ち' && holdSet.has(d.device_id)).length
+  document.getElementById('cntWait').textContent     = c('修理待ち') - holdN
+  document.getElementById('holdNote').textContent    = holdN ? `保留 ${holdN} は別枠(内訳外)` : ''
   document.getElementById('cntSim').textContent      = c('SIM起票済み')
   document.getElementById('cntRma').textContent      = c('RMA登録済み')
   document.getElementById('cntShipped').textContent  = c('発送済み')
@@ -816,26 +980,40 @@ function updateSummary() {
 function needsSIM(t){ return (FLOWS[t]||[]).includes('SIM起票済み') }
 function hasRMA(t){ return (FLOWS[t]||[]).includes('RMA登録済み') }
 function taskGroups() {
-  const g = { simWait:[], rmaWait:[], shipReady:[], shipped:[], setup:[], stagnant:[] }
-  const stag = cfgNum('stagnation_days', 14)
+  const g = { simWait:[], rmaWait:[], shipReady:[], shipped:[], setup:[], stagnant:[], hold:[] }
   for (const d of allDevices) {
     const s = d.status, t = d.device_type
+    if (fsMode() && t === 'FS') continue                                             // v2.2: FS は数量管理(個体は保留含めタスクに出さない)。保留判定より先
+    if (s === '修理待ち' && holdSet.has(d.device_id)) { g.hold.push(d); continue }   // v2.2: 保留は内訳外(滞留アラートにも出さない)
     if (s === '修理待ち' && needsSIM(t)) g.simWait.push(d)
     if ((s === '修理待ち' && !needsSIM(t) && hasRMA(t)) || (s === 'SIM起票済み' && hasRMA(t))) g.rmaWait.push(d)
     if (s === 'RMA登録済み' || (s === 'SIM起票済み' && !hasRMA(t))) g.shipReady.push(d)
     if (s === '発送済み') g.shipped.push(d)
     if (s === '返却済み') g.setup.push(d)
-    if (s !== '正常') { const days = daysSince(d); if (days != null && days >= stag) g.stagnant.push({d, days}) }
+    if (s !== '正常') { const days = daysSince(d); if (days != null && days >= stagLimit(d)) g.stagnant.push({d, days}) }
   }
   return g
 }
 function typeSummary(arr) {
   const m = {}; arr.forEach(d => m[d.device_type] = (m[d.device_type]||0)+1)
-  return Object.entries(m).map(([t,n])=>`${typeName(t)}×${n}`).join(' ')
+  return Object.entries(m).map(([t,n])=>`${esc(typeName(t))}×${n}`).join(' ')
 }
 function renderTasks() {
   const g = taskGroups(), ed = isEditor()
   const items = []
+  // v2.2: 今日の修理デー・担当・棚卸
+  const tr = todayRepair()
+  if (tr) {
+    items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2"><span>📅 <strong>今日は修理デー</strong> <span class="badge bg-warning text-dark">担当: ${esc(rosterFor(tr.day) || '未設定(設定画面のローテ)')}</span></span></div>`)
+    if (tr.inventory) {
+      if (inventoryDoneToday()) items.push(`<div class="task-item" style="opacity:.8"><span>✅ <strong>棚卸 完了</strong> <span class="small text-secondary">${esc(appCfg['last_inventory_by']||'')} ／ 履歴に保存済み</span></span></div>`)
+      else items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2"><span>📋 <strong>棚卸を実施</strong>(修理デー1回目の冒頭15分): 修理依頼品 BOX の中身とツールの修理待ち ${allDevices.filter(d=>d.status==='修理待ち'&&d.device_type!=='FS').length}台を突合</span>
+        ${ed?`<button class="btn btn-danger btn-sm ms-auto" onclick="openInventory()"><i class="bi bi-clipboard-check me-1"></i>棚卸を開く</button>`:''}</div>`)
+    }
+  } else {
+    const next = repairDays().find(r => { const [m,dd] = r.day.split('/').map(Number); const t = new Date(); return m > t.getMonth()+1 || (m === t.getMonth()+1 && dd > t.getDate()) })
+    if (next) items.push(`<div class="task-item"><span>📅 次の修理デー: <strong>${esc(next.day)}</strong>${next.inventory?'(棚卸あり)':''} <span class="small text-secondary">${esc(rosterFor(next.day))}</span></span></div>`)
+  }
   if (g.simWait.length) items.push(`<div class="task-item d-flex flex-wrap align-items-center gap-2">
     <span>🔴 <strong>SIM起票待ち: ${g.simWait.length}台</strong> <span class="text-secondary small">${typeSummary(g.simWait)}</span></span>
     ${ed?`<button class="btn btn-warning btn-sm ms-auto" onclick="taskAction('sim')"><i class="bi bi-ticket-perforated me-1"></i>SIM本文を生成</button>`:''}</div>`)
@@ -854,11 +1032,12 @@ function renderTasks() {
     const worst = g.stagnant.sort((a,b)=>b.days-a.days).slice(0,5)
     items.push(`<div class="task-item"><span>⚠ <strong>滞留アラート:</strong> <span class="small">${worst.map(x=>`${x.d.device_id}(${esc(x.d.status)} ${x.days}日)`).join(', ')}${g.stagnant.length>5?` ほか${g.stagnant.length-5}台`:''}</span></span></div>`)
   }
-  if (!items.length) items.push(`<div class="task-item">✅ 修理パイプラインは空です。全機器正常。</div>`)
+  if (g.hold.length) items.push(`<div class="task-item"><span>⏸ <strong>保留(所在不明・修理待ち内訳から除外): ${g.hold.length}台</strong> <span class="small text-secondary">${g.hold.map(d=>esc(d.device_id)).join(' ')} ／ 次の棚卸で再確認。BOX で見つかれば「BOXにある」に戻す</span></span></div>`)
+  if (!items.filter(x=>!x.includes('修理デー')).length) items.push(`<div class="task-item">✅ 修理パイプラインは空です。全機器正常。</div>`)
   if (!ed && (g.simWait.length||g.rmaWait.length||g.shipReady.length||g.setup.length))
     items.push(`<div class="readonly-note text-secondary">※操作するには右上「編集モード」でログイン</div>`)
   document.getElementById('taskList').innerHTML = items.join('')
-  document.getElementById('taskUpdated').textContent = 'qr-app連携: 30分毎自動同期'
+  document.getElementById('taskUpdated').textContent = 'v2.2 ／ 5分毎に自動更新'
 }
 // タスクパネルのボタン → 対象を自動選択して一括モーダルへ
 window.taskAction = kind => {
@@ -889,6 +1068,7 @@ window.setStatusChip = status => {
 function filteredDevices() {
   const q = document.getElementById('searchInput').value.toLowerCase()
   return allDevices.filter(d => {
+    if (fsMode() && d.device_type === 'FS') return false   // v2.2: FS は数量管理(個体行は出さない。個体を見るには設定で数量モードを OFF)
     if (typeFilter !== 'ALL' && d.device_type !== typeFilter) return false
     if (statusFilter !== 'ALL' && d.status !== statusFilter) return false
     if (q) {
@@ -912,8 +1092,8 @@ function renderTable() {
       ${ed?`<td onclick="event.stopPropagation()"><input type="checkbox" class="select-cb" ${selection.has(d.device_id)?'checked':''}
         onchange="toggleSelect('${esc(d.device_id)}', this.checked)"></td>`:''}
       <td class="fw-semibold text-primary">${esc(d.device_id)}</td>
-      <td><span class="type-badge type-${esc(d.device_type)}">${typeName(d.device_type)}</span></td>
-      <td><span class="status-badge status-${esc(d.status)}">${d.status==='返却済み'?'返却済み・要設定':esc(d.status)}</span>${fbBadge(d.device_id)}${daysBadge(d)}</td>
+      <td><span class="type-badge type-${esc(d.device_type)}">${esc(typeName(d.device_type))}</span></td>
+      <td><span class="status-badge status-${esc(d.status)}">${d.status==='返却済み'?'返却済み・要設定':esc(d.status)}</span>${holdBadge(d)}${faultBadge(d)}${daysBadge(d)}</td>
       <td class="font-monospace small hide-sm">${esc(d.serial_number)}</td>
       <td class="font-monospace small text-muted hide-sm">${esc(d.asset_number)}</td>
       <td class="small">${esc(d.ops_handler||d.it_handler||'')}</td>
@@ -957,12 +1137,12 @@ window.openStatus = id => {
   const d = currentDevice
   selectedStatus = null
   document.getElementById('mDeviceId').textContent = d.device_id
-  document.getElementById('mType').innerHTML = `<span class="type-badge type-${esc(d.device_type)}">${typeName(d.device_type)}</span>`
+  document.getElementById('mType').innerHTML = `<span class="type-badge type-${esc(d.device_type)}">${esc(typeName(d.device_type))}</span>`
   document.getElementById('mModel').textContent = d.model || ''
   document.getElementById('mSerialInput').value = d.serial_number || ''
   document.getElementById('mAssetInput').value = d.asset_number || ''
   document.getElementById('mMemoInput').value = d.memo || ''
-  document.getElementById('mCurrentStatus').innerHTML = `<span class="status-badge status-${esc(d.status)}">${esc(d.status)}</span>${fbBadge(d.device_id)}`
+  document.getElementById('mCurrentStatus').innerHTML = `<span class="status-badge status-${esc(d.status)}">${esc(d.status)}</span>${holdBadge(d)}${faultBadge(d)}`
   const days = daysSince(d)
   document.getElementById('mDays').innerHTML = (d.status!=='正常' && days!=null) ? `<span class="small">${days}日</span>` : '<span class="text-muted small">—</span>'
   document.getElementById('dynamicForm').innerHTML = ''
@@ -1000,7 +1180,7 @@ function simGuide(t) {
   const url = SIM_TEMPLATES[t]
   if (t === 'Avery') return `<div class="alert alert-warning py-2 small">Averyの物理故障はチケット不要。<a href="https://w.amazon.com/bin/view/JP-OTS/AMZL-EF-Function/QuickLink/AMZL/" target="_blank">Avery修理依頼方法(Wiki)</a>でTrouble Shootingと修理依頼をしてください。</div>`
   if (!url) return `<div class="alert alert-light border py-2 small"><a href="https://w.amazon.com/bin/view/JP-OTS/AMZL-EF-Function/QuickLink/AMZL/" target="_blank">JP-OTS QuickLink(Wiki)</a>から該当機器のSIMテンプレートを開いてください。</div>`
-  return `<div class="alert alert-info py-2 small"><a href="${url}" target="_blank">${typeName(t)} SIMテンプレートを開く →</a></div>`
+  return `<div class="alert alert-info py-2 small"><a href="${url}" target="_blank">${esc(typeName(t))} SIMテンプレートを開く →</a></div>`
 }
 function buildForm(status) {
   const d = currentDevice, alias = myAlias()
@@ -1110,7 +1290,8 @@ function statusPatch(d, newStatus, fields) {
   const upd = { status: newStatus, status_changed_at: new Date().toISOString() }
   if (fields.handler) upd.ops_handler = fields.handler
   if (newStatus === '修理待ち') {
-    upd.fault_source = 'manual'
+    upd.fault_source = fields.source || 'manual'          // v2.2: 'scan'(スキャン受付) / 'manual'
+    if (d.status !== '修理待ち') upd.fault_count = (parseInt(d.fault_count) || 0) + 1  // v2.2: 故障回数は実際の遷移(修理待ち以外→修理待ち)だけ +1。復帰してもクリアしない
     if (fields.defCat)    upd.defect_category = fields.defCat
     if (fields.defDetail) upd.defect_detail   = fields.defDetail
   } else if (newStatus === 'SIM起票済み') {
@@ -1160,8 +1341,9 @@ window.saveStatus = async () => {
     }))
   }
   if (!Object.keys(upd).length) { toast('変更がありません', 'warning'); return }
+  let wrote = false
   try {
-    await sbPatch(`device_id=eq.${encodeURIComponent(d.device_id)}`, upd)
+    await sbPatch(`device_id=eq.${encodeURIComponent(d.device_id)}`, upd); wrote = true
     if (selectedStatus) {
       await sbPost('repair_history', { device_id: d.device_id, from_status: d.status,
         to_status: selectedStatus, handler,
@@ -1172,7 +1354,7 @@ window.saveStatus = async () => {
     bootstrap.Modal.getInstance(document.getElementById('statusModal'))?.hide()
     toast(`${d.device_id} を更新しました`)
     await loadAll()
-  } catch(e) { toast('保存エラー: ' + e.message, 'danger') }
+  } catch(e) { toast(partialMsg('保存エラー', e, wrote), 'danger'); if (wrote) loadAll() }
 }
 
 // ─── 一括操作 ──────────────────────────────────────
@@ -1180,6 +1362,7 @@ window.openBulk = target => {
   if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
   bulkTarget = target
   bulkDevices = allDevices.filter(d => selection.has(d.device_id))
+    .filter(d => d.status !== target)                                                            // v2.2: 既に同じ状態の端末は対象外(故障回数の誤加算防止)
     .filter(d => target==='正常' || target==='修理待ち' || (FLOWS[d.device_type]||[]).includes(target))
   if (!bulkDevices.length) { toast('対象機器がありません', 'warning'); return }
   document.getElementById('bulkModalTitle').innerHTML = `<span class="status-badge status-${target}">${target}</span> へ ${bulkDevices.length}台`
@@ -1207,7 +1390,7 @@ function buildBulkForm(target) {
     html += `<div class="col-md-8"><label class="form-label small fw-bold">SIM URL <span class="text-danger">*</span> (起票後に貼り付け)</label>
       <input type="url" class="form-control form-control-sm" id="bSimUrl" placeholder="https://t.corp.amazon.com/P123456789"></div>`
     const types = [...new Set(bulkDevices.map(d=>d.device_type))]
-    if (types.length > 1) html += `<div class="col-12"><div class="alert alert-warning py-1 small mb-0">機種が混在しています(${types.map(typeName).join('/')})。SIMは機種ごとに分けて起票してください。</div></div>`
+    if (types.length > 1) html += `<div class="col-12"><div class="alert alert-warning py-1 small mb-0">機種が混在しています(${types.map(t => esc(typeName(t))).join('/')})。SIMは機種ごとに分けて起票してください。</div></div>`
   } else if (target === 'RMA登録済み') {
     html += `<div class="col-md-5"><label class="form-label small fw-bold">Zebra RMA番号 <span class="text-danger">*</span> (このバッチ共通)</label>
       <input type="text" class="form-control form-control-sm" id="bRma" placeholder="例: 12345678"></div>
@@ -1232,7 +1415,7 @@ function buildBulkForm(target) {
     showBulkGen('SIM本文(自動生成) — コピーしてテンプレに貼り付け', buildSimText())
     const types = [...new Set(bulkDevices.map(d=>d.device_type))]
     extra.innerHTML = types.map(t => SIM_TEMPLATES[t]
-      ? `<a class="btn btn-warning btn-sm" href="${SIM_TEMPLATES[t]}" target="_blank"><i class="bi bi-ticket-perforated me-1"></i>${typeName(t)}テンプレを開く</a>` : '').join('')
+      ? `<a class="btn btn-warning btn-sm" href="${SIM_TEMPLATES[t]}" target="_blank"><i class="bi bi-ticket-perforated me-1"></i>${esc(typeName(t))}テンプレを開く</a>` : '').join('')
   } else if (target === 'RMA登録済み') {
     showBulkGen('Zebraポータル登録用データ(タブ区切り — Excelにも貼れます)', buildRmaText())
   } else if (target === '発送済み') {
@@ -1268,7 +1451,7 @@ function buildBulkSlackText() {
   const today = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})
   const byType = {}
   bulkDevices.forEach(d => (byType[d.device_type] = byType[d.device_type]||[]).push(d))
-  const seg = Object.entries(byType).map(([t,devs])=>`${typeName(t)}×${devs.length}`).join(' / ')
+  const seg = Object.entries(byType).map(([t,devs])=>`${esc(typeName(t))}×${devs.length}`).join(' / ')
   return [`【一括発送】${seg} ✈️ (${today})`,
     ...bulkDevices.map(d=>`・${d.device_id}  ${d.serial_number||''}  ${d.defect_category||''}`),
     `担当: ${myAlias()}`, `詳細: https://trainboy1120-jpg.github.io/dej6-it-mgmt/`].join('\n')
@@ -1289,11 +1472,17 @@ window.saveBulk = async () => {
   if (bulkTarget === 'SIM起票済み' && !(fields.simUrl||'').trim()) { toast('SIM URLを入力してください', 'danger'); return }
   if (bulkTarget === 'RMA登録済み' && !(fields.rma||'').trim()) { toast('RMA番号を入力してください', 'danger'); return }
   if (bulkTarget === '発送済み' && !(fields.shipDate||'').trim()) { toast('発送日を入力してください', 'danger'); return }
+  if (bulkDevices.some(d => d.status === bulkTarget)) { toast(`既に「${bulkTarget}」の端末が含まれています。選択をやり直してください`, 'danger'); return }
+  let wrote = false
   try {
     const ids = bulkDevices.map(d=>d.device_id)
     const idFilter = 'device_id=in.(' + ids.map(i=>'"'+i+'"').join(',') + ')'
-    const upd = statusPatch(bulkDevices[0], bulkTarget, fields)
-    await sbPatch(idFilter, upd)
+    if (bulkTarget === '修理待ち') {                 // v2.2: fault_count は端末ごとに +1(先頭端末の値で上書きしない)
+      for (const d of bulkDevices) { await sbPatch(`device_id=eq.${encodeURIComponent(d.device_id)}`, statusPatch(d, bulkTarget, fields)); wrote = true }
+    } else {
+      const upd = statusPatch(bulkDevices[0], bulkTarget, fields)
+      await sbPatch(idFilter, upd); wrote = true
+    }
     await sbPost('repair_history', bulkDevices.map(d => ({
       device_id: d.device_id, from_status: d.status, to_status: bulkTarget, handler,
       note: fields.defDetail || (bulkTarget==='SIM起票済み'?fields.simUrl:'') || '一括操作',
@@ -1303,7 +1492,7 @@ window.saveBulk = async () => {
     toast(`${ids.length}台を「${bulkTarget}」に更新しました`)
     selection.clear()
     await loadAll()
-  } catch(e) { toast('一括保存エラー: ' + e.message, 'danger') }
+  } catch(e) { toast(partialMsg('一括保存エラー', e, wrote), 'danger'); if (wrote) loadAll() }
 }
 
 // ─── Shipping Manifest 印刷 ─────────────────────────
@@ -1376,18 +1565,34 @@ window.openConfig = () => {
   document.getElementById('cfgAddrZebra').value  = appCfg['addr_zebra'] || ''
   document.getElementById('cfgAddrTyo4').value   = appCfg['addr_tyo4'] || ''
   document.getElementById('cfgAddrReturn').value = appCfg['addr_return'] || ''
-  document.getElementById('cfgStagDays').value   = cfgNum('stagnation_days', 14)
-  document.getElementById('cfgThreshold').value  = cfgNum('alert_threshold', 10)
+  document.getElementById('cfgStagDays').value    = cfgNum('stagnation_days', 7)
+  document.getElementById('cfgStagShipped').value = cfgNum('stagnation_days_shipped', 14)
+  document.getElementById('cfgRepairDays').value  = appCfg['repair_days'] || ''
+  document.getElementById('cfgRoster').value      = appCfg['repair_roster'] || ''
+  document.getElementById('cfgFsMode').value      = fsMode() ? '1' : '0'
+  document.getElementById('cfgFsTotal').value     = cfgNum('fs_total', 190)
+  document.getElementById('cfgScanDelim').value   = (appCfg['scan_delim'] === 'Tab') ? 'Tab' : 'Enter'
+  document.getElementById('cfgScanFault').value   = appCfg['scan_fault'] || 'FAULT'
   new bootstrap.Modal(document.getElementById('configModal')).show()
 }
 window.saveConfig = async () => {
   if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const newTotal = Math.max(0, parseInt(document.getElementById('cfgFsTotal').value) || 0)
+  const faultCode = (document.getElementById('cfgScanFault').value.trim() || 'FAULT').toUpperCase()
+  { const err = scanFaultError(faultCode); if (err) { toast('故障コード: ' + err, 'danger'); return } }
+  if (document.getElementById('cfgFsMode').value === '1') { const err = fsWaitError(fsTotals().wait, newTotal); if (err) { toast('FS 総台数: ' + err, 'danger'); return } }
   const rows = [
     { key:'addr_zebra',      value: document.getElementById('cfgAddrZebra').value },
     { key:'addr_tyo4',       value: document.getElementById('cfgAddrTyo4').value },
     { key:'addr_return',     value: document.getElementById('cfgAddrReturn').value },
-    { key:'stagnation_days', value: String(document.getElementById('cfgStagDays').value||'14') },
-    { key:'alert_threshold', value: String(document.getElementById('cfgThreshold').value||'10') },
+    { key:'stagnation_days',         value: String(parseInt(document.getElementById('cfgStagDays').value) || 7) },
+    { key:'stagnation_days_shipped', value: String(parseInt(document.getElementById('cfgStagShipped').value) || 14) },
+    { key:'repair_days',             value: document.getElementById('cfgRepairDays').value.trim() },
+    { key:'repair_roster',           value: document.getElementById('cfgRoster').value.trim() },
+    { key:'fs_qty_mode',             value: document.getElementById('cfgFsMode').value === '1' ? '1' : '0' },
+    { key:'fs_total',                value: String(newTotal) },
+    { key:'scan_delim',              value: document.getElementById('cfgScanDelim').value === 'Tab' ? 'Tab' : 'Enter' },
+    { key:'scan_fault',              value: faultCode },
   ].map(r => ({...r, updated_by: myAlias(), updated_at: new Date().toISOString()}))
   try {
     await sbPost('app_config', rows, 'resolution=merge-duplicates,return=minimal')
@@ -1517,8 +1722,290 @@ document.getElementById('guideModal').addEventListener('hidden.bs.modal', () => 
   bootstrap.Modal.getOrCreateInstance(document.getElementById('statusModal')).show()
 })
 
+// ─── v2.2 FS 数量管理パネル(fs_qty_mode=1) ─────────────
+function fsLotState(l){ const q=+l.qty||0, r=Math.min(+l.received_qty||0,q), rd=Math.min(+l.ready_qty||0,r); return r<q ? '発送中' : (rd<r ? '要設定' : '完了') }
+function renderFsPanel() {
+  const el = document.getElementById('fsPanel'); if (!el) return
+  if (!fsMode()) { el.classList.add('d-none'); return }
+  el.classList.remove('d-none')
+  const t = fsTotals(), ed = isEditor()
+  const card = (label, n, color, sub) => `<div class="col-6 col-md"><div class="text-center p-2 rounded h-100" style="background:#f8f9fa;border-top:3px solid ${color}"><div class="big" style="color:${color}" data-fs="${label}">${n}</div><div class="small text-muted">${label}${sub?`<span class="d-block" style="font-size:.65rem">${sub}</span>`:''}</div></div></div>`
+  const open = fsLots.filter(l => fsLotState(l) !== '完了')
+  const rows = open.map(l => `<tr data-lot="${esc(l.id)}">
+      <td>${esc(l.shipped_at||'')}</td><td class="text-end">${+l.qty||0}</td><td class="small">${esc(l.rma_numbers||'')}</td>
+      <td class="text-end">${ed?`<input type="number" class="form-control form-control-sm text-end d-inline-block" style="width:5rem" min="0" max="${+l.qty||0}" value="${+l.received_qty||0}" data-lot-field="received_qty" title="減らせません(訂正は SA が SQL で)">`:(+l.received_qty||0)}</td>
+      <td class="text-end">${ed?`<input type="number" class="form-control form-control-sm text-end d-inline-block" style="width:5rem" min="0" max="${+l.qty||0}" value="${+l.ready_qty||0}" data-lot-field="ready_qty">`:(+l.ready_qty||0)}</td>
+      <td><span class="badge ${fsLotState(l)==='発送中'?'bg-primary':'bg-info text-dark'}">${fsLotState(l)}</span></td>
+      <td class="text-nowrap">${ed?`<button class="btn btn-sm btn-outline-primary" data-lot-act="save">更新</button>${(+l.received_qty||0)===0 && !l.received_at?` <button class="btn btn-sm btn-outline-danger" data-lot-act="unship" title="誤登録の取消(受領前のみ)">取消</button>`:''}`:''}</td></tr>`).join('')
+  el.innerHTML = `<div class="d-flex flex-wrap align-items-center gap-2 mb-2"><span class="fw-bold"><i class="bi bi-boxes me-1 text-secondary"></i>FS(フィンガースキャナー) 数量管理</span>
+      <span class="small text-muted">個体ではなく台数で管理。合計 = 総台数(${t.total})。個体行は表示しない(設定で数量モードを OFF にすると従来表示)</span></div>
+    <div class="row g-2 mb-2">
+      ${card('稼働', t.active, '#198754', '自動計算')}${card('修理待ち(BOX)', t.wait, '#dc3545', '棚卸で入力')}${card('発送中', t.shipping, '#6f42c1', 'ロット合計')}${card('返却済み・要設定', t.setup, '#0dcaf0', 'ロット合計')}${card('総台数', t.total, '#1e293b', '設定')}
+    </div>
+    ${t.active < 0 ? '<div class="alert alert-danger py-1 small mb-2">稼働がマイナスです。総台数(設定)か BOX 台数を確認してください</div>' : ''}
+    ${ed ? `<div class="d-flex flex-wrap align-items-end gap-2 mb-2 p-2 rounded" style="background:#f1f5f9">
+      <div><label class="form-label small mb-0">BOX 内の修理待ち台数</label><input type="number" min="0" class="form-control form-control-sm" id="fsWaitInput" value="${t.wait}" style="width:7rem"></div>
+      <button class="btn btn-sm btn-outline-danger" onclick="fsSetWait()">台数を更新</button>
+      <div class="vr mx-1"></div>
+      <div><label class="form-label small mb-0">まとめて発送: 台数</label><input type="number" min="1" max="${t.wait}" class="form-control form-control-sm" id="fsShipQty" style="width:7rem"></div>
+      <div class="flex-fill"><label class="form-label small mb-0">RMA 番号(カンマ区切り)</label><input class="form-control form-control-sm" id="fsShipRma" placeholder="例: 12345678, 12345679"></div>
+      <button class="btn btn-sm btn-primary" onclick="fsShip()"><i class="bi bi-truck me-1"></i>発送(ロット作成)</button></div>` : ''}
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="fsLotTable"><thead class="table-light"><tr><th>発送日</th><th class="text-end">台数</th><th>RMA</th><th class="text-end">受領</th><th class="text-end">設定済み</th><th>状態</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="text-muted small">進行中のロットはありません</td></tr>'}</tbody></table></div>`
+}
+window.fsSetWait = async () => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const n = parseInt(document.getElementById('fsWaitInput').value)
+  const err = fsWaitError(n); if (err) { toast(err, 'danger'); return }
+  try { await sbRpc('fs_set_wait', { p_wait: n, p_by: myAlias() }); toast(`FS 修理待ち台数を ${n} に更新しました`); await loadAll() }
+  catch(e) { toast('更新エラー: ' + e.message, 'danger') }
+}
+window.fsShip = async () => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const qty = parseInt(document.getElementById('fsShipQty').value), rma = document.getElementById('fsShipRma').value.trim()
+  if (isNaN(qty) || qty < 1) { toast('発送台数を入力してください', 'danger'); return }
+  if (qty > fsTotals().wait) { toast(`BOX の修理待ち台数(${fsTotals().wait})を超えています`, 'danger'); return }
+  if (!rma) { toast('RMA 番号を入力してください', 'danger'); return }
+  try { await sbRpc('fs_ship', { p_qty: qty, p_rma: rma, p_by: myAlias() }); toast(`FS ${qty}台を発送ロットに登録しました`); await loadAll() }
+  catch(e) { toast('発送登録エラー: ' + e.message, 'danger') }
+}
+document.getElementById('fsPanel').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-lot-act]'); if (!btn) return
+  const tr = btn.closest('tr[data-lot]'); const id = tr?.dataset.lot; if (!id) return
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const lot = fsLots.find(l => String(l.id) === id); if (!lot) return
+  try {
+    if (btn.dataset.lotAct === 'unship') {
+      if (!confirm(`${lot.shipped_at} の ${lot.qty}台ロットを取り消しますか?(台数は BOX の修理待ちへ戻ります)`)) return
+      await sbRpc('fs_unship', { p_lot: id })
+      toast('ロットを取り消しました')
+    } else {
+      const q = +lot.qty||0
+      const rec = parseInt(tr.querySelector('[data-lot-field="received_qty"]').value), rdy = parseInt(tr.querySelector('[data-lot-field="ready_qty"]').value)
+      if (isNaN(rec) || isNaN(rdy) || rec < 0 || rdy < 0 || rec > q || rdy > rec) { toast(`0 ≤ 設定済み ≤ 受領 ≤ 台数(${q}) で入力してください`, 'danger'); return }
+      if (rec < (+lot.received_qty||0) || rdy < (+lot.ready_qty||0)) { toast('受領・設定済みの台数は減らせません(誤入力の訂正は SA が SQL で行い、メモに残す)', 'danger'); return }
+      const body = { received_qty: rec, ready_qty: rdy }
+      if (rec > 0 && !lot.received_at) body.received_at = todayISO()
+      await sbPatchTable('fs_lots', 'id=eq.' + encodeURIComponent(id), body)
+      toast('ロットを更新しました')
+    }
+    await loadAll()
+  } catch(err) { toast('ロット更新エラー: ' + err.message, 'danger') }
+})
+
+// ─── v2.2 棚卸(修理依頼品 BOX ⇄ ツール突合) ───────────
+const SOURCE_LABEL = { scan:'スキャン受付', manual:'手動', legacy:'旧ツール' }
+function invTargets(){ return allDevices.filter(d => d.status === '修理待ち' && d.device_type !== 'FS') }
+window.openInventory = () => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  invState = { rows: {}, added: [] }
+  const targets = invTargets()
+  document.getElementById('invHeadInfo').textContent = `${todayISO()} ／ ${myAlias()}`
+  document.getElementById('invCount').textContent = `${targets.length}台(保留 ${targets.filter(d=>holdSet.has(d.device_id)).length} を含む)`
+  document.getElementById('invNote').value = ''
+  document.getElementById('invAddId').value = ''
+  document.getElementById('invAddList').innerHTML = allDevices.filter(d => d.status === '正常' && !(fsMode() && d.device_type === 'FS')).map(d => `<option value="${esc(d.device_id)}">`).join('')
+  const fsBox = document.getElementById('invFsWait').closest('.row')
+  if (fsMode()) {
+    const t = fsTotals(); fsBox.classList.remove('d-none')
+    document.getElementById('invFsWait').value = t.wait
+    document.getElementById('invFsShipping').value = t.shipping + (t.setup ? ` (+要設定 ${t.setup})` : '')
+    document.getElementById('invFsTotal').value = t.total
+    invFsRecalc()
+  } else fsBox.classList.add('d-none')
+  invRenderRows(); invRenderAdded()
+  new bootstrap.Modal(document.getElementById('inventoryModal')).show()
+}
+function invFsRecalc(){
+  const t = fsTotals(), w = parseInt(document.getElementById('invFsWait').value)
+  const active = isNaN(w) ? '' : t.total - w - t.shipping - t.setup
+  const el = document.getElementById('invFsActive'); el.value = active; el.classList.toggle('text-danger', active !== '' && active < 0)
+}
+document.getElementById('invFsWait').addEventListener('input', invFsRecalc)
+function invRenderRows() {
+  const targets = invTargets(), ed = isEditor()
+  const btn = (id, val, cur, cls, label) => `<button type="button" class="btn ${cur===val?'btn-'+cls:'btn-outline-'+cls}" data-inv-id="${esc(id)}" data-inv-val="${val}">${label}</button>`
+  document.getElementById('invBody').innerHTML = targets.length ? targets.map(d => {
+    const cur = invState.rows[d.device_id] || '', days = daysSince(d)
+    return `<tr class="${cur?'':'table-warning'}"><td><strong>${esc(d.device_id)}</strong>${holdBadge(d)}</td>
+      <td><span class="status-badge status-${esc(d.status)}">${esc(d.status)}</span></td>
+      <td>${days==null?'—':days+'日'}</td><td>${parseInt(d.fault_count)||0}回</td><td class="small">${esc(SOURCE_LABEL[d.fault_source] || d.fault_source || '')}</td>
+      <td><div class="btn-group btn-group-sm" role="group">
+        ${btn(d.device_id,'in',cur,'success','BOX にある')}${btn(d.device_id,'hold',cur,'secondary',holdSet.has(d.device_id)?'まだ無い(保留のまま)':'無い → 保留')}${btn(d.device_id,'ok',cur,'primary','稼働中だった → 正常')}
+      </div></td></tr>` }).join('') : '<tr><td colspan="6" class="text-muted small">修理待ちの機器(FS 以外)はありません</td></tr>'
+  invRenderFooter()
+}
+function invRenderFooter() {
+  const targets = invTargets(), unsel = targets.filter(d => !invState.rows[d.device_id]).length
+  const f = document.getElementById('invFooter'), b = document.getElementById('invSaveBtn')
+  f.innerHTML = unsel ? `<span class="text-danger fw-bold">未選択 ${unsel}件</span> — 全行を選ぶと保存できます` : `<span class="text-success">全 ${targets.length}行 選択済み</span>${invState.added.length?` ／ 未登録品 ${invState.added.length}件を修理待ちに登録`:''}`
+  b.disabled = unsel > 0
+}
+document.getElementById('invBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-inv-id]'); if (!b) return
+  invState.rows[b.dataset.invId] = b.dataset.invVal; invRenderRows()
+})
+function invRenderAdded() {
+  document.getElementById('invAdded').innerHTML = invState.added.map(id => `<span class="badge bg-danger">${esc(id)} <a href="#" class="text-white ms-1" data-inv-remove="${esc(id)}" title="取り消す">✕</a></span>`).join('') || '<span class="small text-muted">なし</span>'
+  invRenderFooter()
+}
+document.getElementById('invAdded').addEventListener('click', e => {
+  const a = e.target.closest('[data-inv-remove]'); if (!a) return
+  e.preventDefault(); invState.added = invState.added.filter(x => x !== a.dataset.invRemove); invRenderAdded()
+})
+window.invAddUnregistered = () => {
+  const inp = document.getElementById('invAddId'); let id = inp.value.trim().toUpperCase()
+  if (/^\d{1,3}$/.test(id)) id = 'SSP-' + id.padStart(3, '0')
+  const d = allDevices.find(x => x.device_id === id)
+  if (!d) { toast(`${id || '(空)'} はマスタに無い機器IDです(先に機器を登録してください)`, 'danger'); return }
+  if (fsMode() && d.device_type === 'FS') { toast('FS は下の「BOX 内の修理待ち台数」で入力してください', 'warning'); return }
+  if (d.status !== '正常') { toast(`${id} は既に「${d.status}」です`, 'warning'); return }
+  if (!invState.added.includes(id)) invState.added.push(id)
+  inp.value = ''; invRenderAdded()
+}
+window.finishInventory = async () => {
+  if (!isEditor()) { toast('編集モードでログインしてください', 'danger'); return }
+  const targets = invTargets(), unsel = targets.filter(d => !invState.rows[d.device_id])
+  if (unsel.length) { toast(`未選択が ${unsel.length}件あります`, 'danger'); return }
+  let fsWait = null
+  if (fsMode()) { fsWait = parseInt(document.getElementById('invFsWait').value); const err = fsWaitError(fsWait); if (err) { toast('FS: ' + err + '(何も保存していません)', 'danger'); return } }
+  const note = document.getElementById('invNote').value.trim(), handler = myAlias(), btn = document.getElementById('invSaveBtn')
+  const hist = [], f = id => 'device_id=eq.' + encodeURIComponent(id)
+  btn.disabled = true
+  let addedDone = 0, addedDevs = [], wrote = false
+  try {
+    if (invState.added.length) {                              // 書込前に Supabase の現在値で再検証(ローカルキャッシュを信用しない)
+      const fresh = await sbGet('devices?select=*&device_id=in.(' + invState.added.map(i => '"' + i + '"').join(',') + ')')
+      if (!Array.isArray(fresh)) throw new Error('再検証の応答が不正です')
+      addedDevs = invState.added.map(id => fresh.find(x => x.device_id === id && x.status === '正常'))
+      const badAdded = invState.added.filter((id, k) => !addedDevs[k])
+      if (badAdded.length) { toast(`未登録追加の ${badAdded.join(', ')} はマスタに無いか「正常」ではありません(サーバー再確認)。取り消してから保存してください(何も保存していません)`, 'danger'); btn.disabled = false; return }
+    }
+    for (const d of addedDevs) {                              // (a) BOX 内の未登録品 → 正常→修理待ち(fault_source=manual)
+      await sbPatch(f(d.device_id), statusPatch(d, '修理待ち', { handler, source: 'manual', defCat: 'その他', defDetail: '棚卸で BOX 内に未登録品を発見' })); addedDone++; wrote = true
+      hist.push(histRow(d, '修理待ち', { event: 'unregistered_found', note: '棚卸: BOX 内の未登録品' }))
+    }
+    for (const d of targets) {
+      const sel = invState.rows[d.device_id], wasHold = holdSet.has(d.device_id)
+      if (sel === 'hold') { if (!wasHold) hist.push(histRow(d, '修理待ち', { event: 'hold_open', note: '棚卸: BOX に無い(所在確認中)' })) }          // (b)
+      else if (sel === 'in') { if (wasHold) hist.push(histRow(d, '修理待ち', { event: 'hold_close', note: '棚卸: BOX で確認(保留解除)' })) }       // (c)
+      else if (sel === 'ok') {                                                                                                                  // (d)
+        await sbPatch(f(d.device_id), statusPatch(d, '正常', { handler })); wrote = true
+        hist.push(histRow(d, '正常', { event: wasHold ? 'hold_close' : 'inventory_ok', note: '棚卸で稼働確認 → 正常' }))
+      }
+    }
+    if (hist.length) { await sbPost('repair_history', hist); wrote = true }
+    if (fsWait != null) { await sbRpc('fs_set_wait', { p_wait: fsWait, p_by: handler }); wrote = true }   // DB 側でも BOX+発送中+要設定 ≤ 総台数 を検証
+    await cfgUpsert({ last_inventory_date: todayISO(), last_inventory_by: handler, last_inventory_note: note }); wrote = true                                     // (e) inventory 実施記録は app_config(repair_history は device_id 必須のため)
+    bootstrap.Modal.getInstance(document.getElementById('inventoryModal'))?.hide()
+    toast(`棚卸を保存しました(履歴 ${hist.length}件${addedDone?`・未登録 ${addedDone}台を修理待ちに登録`:''})`)
+    await loadAll()
+  } catch(e) { toast(partialMsg('棚卸保存エラー', e, wrote), 'danger'); btn.disabled = false; if (wrote) loadAll() }
+}
+
+// ─── v2.2 スキャン受付(?mode=scan): USB スキャナのキーボード入力 ──
+const scanState = { stage: 'idle', device: null, timer: null, tick: null, idleTimer: null, buf: '', lastKey: 0, recent: [] }
+function scanDelim(){ return appCfg['scan_delim'] === 'Tab' ? 'Tab' : 'Enter' }
+const SCAN_FAULT_RE = /^[A-Z0-9_-]{3,20}$/           // 故障コードに使える文字(制御文字・空白・区切り文字を含まない)
+function scanFaultError(v) {   // v2.2: 故障コードは 端末QR 形式(3桁 / SSP-ddd)・予約語 FORCERETURN と衝突してはいけない
+  const c = String(v || '').trim().toUpperCase()
+  if (!SCAN_FAULT_RE.test(c)) return '故障コードは英数字・_・- の 3〜20 文字にしてください(空白・記号・制御文字は不可)'
+  if (c === 'FORCERETURN') return 'FORCERETURN は予約語です(Phase 3 の強制返却用)'
+  if (/^(?:SSP-)?\d{3}$/.test(c)) return '端末QR と同じ形式(3桁 / SSP-ddd)は故障コードにできません'
+  return null
+}
+function scanFaultCode(){ const v = String(appCfg['scan_fault'] || 'FAULT').toUpperCase(); return scanFaultError(v) ? 'FAULT' : v }   // 設定が不正なら既定 FAULT にフォールバック(メタに警告)
+function scanTimeoutMs(){ return cfgNum('scan_timeout_ms', SCAN_TIMEOUT_DEFAULT_MS) }
+function scanInit() {
+  document.body.classList.add('scan-mode')
+  document.querySelector('nav.navbar').classList.add('d-none')
+  document.getElementById('mainWrap').classList.add('d-none')
+  document.getElementById('scanPanel').classList.remove('d-none')
+  document.addEventListener('keydown', scanKey)
+  scanRenderMeta()
+}
+function scanRenderMeta() {
+  const el = document.getElementById('scanMeta'); if (!el) return
+  const badCfg = appCfg['scan_fault'] && scanFaultError(appCfg['scan_fault'])
+  el.textContent = `${isEditor() ? '編集者: ' + myAlias() : '未ログイン(登録できません → 右下の PIN でログイン)'} ／ 区切り: ${scanDelim()} ／ 故障コード: ${scanFaultCode()}${badCfg ? '(設定値が不正なため既定 FAULT を使用: ' + badCfg + ')' : ''} ／ 待ち ${Math.round(scanTimeoutMs()/1000)}秒 ／ 更新 ${new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}`
+}
+function scanShow(stage, title, sub) {
+  const st = document.getElementById('scanStage'); st.className = 'scan-stage stage-' + stage
+  document.getElementById('scanTitle').textContent = title
+  document.getElementById('scanSub').textContent = sub || ''
+  if (stage !== 'wait') document.getElementById('scanCountdown').textContent = ''
+}
+function scanClearTimers(){ clearTimeout(scanState.timer); clearInterval(scanState.tick); clearTimeout(scanState.idleTimer); scanState.timer = scanState.tick = scanState.idleTimer = null }
+function scanIdle(delayMs) {
+  clearTimeout(scanState.idleTimer)
+  const go = () => { scanClearTimers(); scanState.stage = 'idle'; scanState.device = null; scanShow('idle', '端末の QR を読んでください', `故障登録: 端末QR → ${scanFaultCode()} QR ／ 修理から戻った端末: 端末QR だけ`) }
+  if (delayMs) scanState.idleTimer = setTimeout(go, delayMs); else go()
+}
+function scanLog(read, result, cls) {
+  scanState.recent.unshift({ t: new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit', second:'2-digit'}), read: String(read).slice(0, 24), result, cls: cls || '' })
+  scanState.recent = scanState.recent.slice(0, 10)
+  document.getElementById('scanRecent').innerHTML = scanState.recent.map(r => `<tr><td>${esc(r.t)}</td><td><code>${esc(r.read)}</code></td><td class="${esc(r.cls)}">${esc(r.result)}</td></tr>`).join('')
+}
+function scanKey(e) {
+  if (document.querySelector('.modal.show')) return                                    // PIN ログイン中は受けない
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return
+  const now = Date.now(); if (now - scanState.lastKey > 2000) scanState.buf = ''; scanState.lastKey = now   // 2秒空いたら別スキャン
+  if (e.key === scanDelim()) { e.preventDefault(); const code = scanState.buf.trim(); scanState.buf = ''; if (code) scanHandle(code); return }
+  if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); return }          // 設定と違う区切りは無視(フォーカス移動も止める)
+  if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) scanState.buf += e.key
+}
+async function scanHandle(raw) {
+  const code = raw.toUpperCase(), fault = scanFaultCode()
+  if (code === 'FORCERETURN') { scanClearTimers(); scanShow('warn', 'FORCERETURN は Phase 3 まで無効', `端末QR → ${fault}(故障) か、返却済み端末の端末QR だけ受け付けます`); scanLog(raw, '無効(Phase 3)', 'text-warning'); scanIdle(4000); return }
+  if (code === fault) {
+    if (scanState.stage !== 'wait' || !scanState.device) { scanClearTimers(); scanShow('warn', '先に端末の QR を読んでください', `順番: 端末QR → ${fault}`); scanLog(raw, '順序違い', 'text-warning'); scanIdle(4000); return }
+    const d = scanState.device; scanClearTimers(); scanState.stage = 'busy'
+    if (!isEditor()) { scanShow('err', 'PIN でログインしてください', '右下の「PIN でログイン」で編集者になると登録できます(初回のみ)'); scanLog(`${d.device_id} → ${fault}`, '未ログイン', 'text-danger'); scanIdle(5000); return }
+    let wrote = false
+    try {
+      await sbPatch('device_id=eq.' + encodeURIComponent(d.device_id), statusPatch(d, '修理待ち', { handler: myAlias(), source: 'scan', defCat: 'その他', defDetail: 'スキャン受付(' + fault + ')' })); wrote = true
+      await sbPost('repair_history', [histRow(d, '修理待ち', { event: 'scan_fault', note: 'スキャン受付: ' + fault })])
+      const n = (parseInt(d.fault_count) || 0) + 1
+      scanShow('ok', `${d.device_id} を修理待ちに登録しました`, `故障 ${n}回目 → 修理依頼品 BOX へ入れてください`)
+      scanLog(`${d.device_id} → ${fault}`, `修理待ち(故障${n}回目)`, 'text-success')
+      loadAll()
+    } catch(err) { scanShow('err', wrote ? '登録は保存済み・履歴の保存に失敗' : '登録エラー', partialMsg('', err, wrote).slice(2) + ' SA に伝えてください'); scanLog(`${d.device_id} → ${fault}`, wrote ? 'エラー(端末は更新済み)' : 'エラー', 'text-danger'); if (wrote) loadAll() }
+    scanIdle(4000); return
+  }
+  const m = code.match(/^(?:SSP-)?(\d{3})$/)
+  if (!m) { scanClearTimers(); scanShow('err', '無効な QR です', raw.slice(0, 40)); scanLog(raw, '無効', 'text-danger'); scanIdle(4000); return }
+  const id = 'SSP-' + m[1], d = allDevices.find(x => x.device_id === id)
+  scanClearTimers()
+  if (!d) { scanShow('err', `${id} はマスタに未登録です`, 'SA に伝えてください(機器一覧に追加が必要)'); scanLog(raw, '未登録', 'text-danger'); scanIdle(4000); return }
+  if (d.status === '正常') {
+    scanState.stage = 'wait'; scanState.device = d
+    scanShow('wait', `${id} を選択中`, `故障なら ${fault} の QR を読んでください(読まなければ何も変わりません)`)
+    const until = Date.now() + scanTimeoutMs(), cd = document.getElementById('scanCountdown')
+    const tickFn = () => { cd.textContent = `あと ${Math.max(0, Math.ceil((until - Date.now())/1000))} 秒` }; tickFn()
+    scanState.tick = setInterval(tickFn, 250)
+    scanState.timer = setTimeout(() => { scanLog(id, 'タイムアウト(変更なし)', 'text-secondary'); scanIdle() }, scanTimeoutMs())
+    scanLog(raw, `選択中(${fault} 待ち)`, '')
+    return
+  }
+  if (d.status === '返却済み') {
+    scanState.stage = 'busy'
+    if (!isEditor()) { scanShow('err', 'PIN でログインしてください', '右下の「PIN でログイン」で編集者になると登録できます(初回のみ)'); scanLog(raw, '未ログイン', 'text-danger'); scanIdle(5000); return }
+    let wrote = false
+    try {
+      await sbPatch('device_id=eq.' + encodeURIComponent(id), statusPatch(d, '正常', { handler: myAlias() })); wrote = true
+      await sbPost('repair_history', [histRow(d, '正常', { event: 'scan_return', note: 'スキャン受付で復帰' })])
+      scanShow('ok', `${id} を正常に戻しました`, '設定済みの端末を棚(クレードル)へ戻してください')
+      scanLog(raw, '返却済み → 正常', 'text-success')
+      loadAll()
+    } catch(err) { scanShow('err', wrote ? '復帰は保存済み・履歴の保存に失敗' : '更新エラー', partialMsg('', err, wrote).slice(2) + ' SA に伝えてください'); scanLog(raw, wrote ? 'エラー(端末は更新済み)' : 'エラー', 'text-danger'); if (wrote) loadAll() }
+    scanIdle(4000); return
+  }
+  scanShow('warn', `${id} は処理中(${d.status})`, holdSet.has(id) ? '対象外: 保留中の端末です。修理依頼品 BOX へ入れ、修理デーの棚卸で「BOX にある」を選んでください' : '対象外: この端末は SA が管理ツールで進めています(BOX へは入れないでください)')
+  scanLog(raw, `対象外(${d.status})`, 'text-warning'); scanIdle(4000)
+}
 
 // ─── 起動 ─────────────────────────────────────────
+if (SCAN_MODE) scanInit()
 applyEditorUI()
 // ディープリンク ?guide=<機種>: 初回ロード完了後(失敗時も)に開く。appCfg の住所を初回描画から反映するため loadAll を待つ
 loadAll().finally(() => { const q = new URL(location.href).searchParams; if (q.has('guide')) guideOpen(q.get('guide'), null) })

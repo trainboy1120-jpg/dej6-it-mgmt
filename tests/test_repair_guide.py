@@ -98,8 +98,8 @@ for t, g in GD.items():
     for s in flow_of(t): check(f'③ {t}[{s}] マージ後 actions ≥1', len(merged_actions(t, s)) >= 1)
 check('③ ZD611 修理待ち 期待配列', merged_actions('ZD611', '修理待ち') == ['番号札(No.)を確認する', 'このツールで機器をタップする', '「修理待ち」を押す', '不具合カテゴリーを選ぶ', '症状を入力する', '「保存する」を押す', '修理中ゾーンの定位置に置く(カートに戻さない)'])
 check('③ PC SIM起票済み 期待配列', merged_actions('PC', 'SIM起票済み') == ['JP-OTS QuickLink(Wiki)を開く(下のリンク)', 'ページ内の PC 依頼テンプレートを開く', '機器ID・シリアル・症状を入力する', '起票する', '起票できたSIMのURLをこのツールの「SIM URL」欄に貼る', '「保存する」を押す'])
-check('③ SSP 修理待ち 期待配列', merged_actions('SSP', '修理待ち') == ['qr-app(SSP管理ツール)で故障登録する', '機器の番号(機器ID)を確認する', '下流の SSP専用回収Box へ入れる'])
-check('③ SSP 修理待ち fallback あり', GD['SSP']['step_extra']['修理待ち']['fallback']['title'] == 'qr-app が使えない時')
+check('③ SSP 修理待ち 期待配列(v2.2 スキャン受付)', merged_actions('SSP', '修理待ち') == ['チェックシートに ✓ を書く', 'スキャン受付の PC で端末の QR を読む', 'FAULT の QR を読む(15秒以内)', '画面が緑になるのを確認する', '修理依頼品 BOX へ入れる'])
+check('③ SSP 修理待ち fallback あり(v2.2)', GD['SSP']['step_extra']['修理待ち']['fallback']['title'] == 'スキャン受付が使えない時(SA が修理デーに登録)')
 
 # ④ URL は https で始まる / url null は note を持つ
 for n in ['GUIDE_URL_WIKI', 'GUIDE_URL_ZEBRA', 'GUIDE_URL_SLACK']: check(f'④ {n} https', C[n].startswith('https://'))
@@ -132,7 +132,7 @@ check('⑥ ガイド内の全 href が esc(guideSafeUrl(..))', all(h.startswith(
 check('⑥ guideSafeUrl は https 以外を # に', "return /^https:\\/\\//.test(String(u||'')) ? u : '#'" in guide_js)
 
 # ⑦ モーダル数 6→7 / ⑧ 見出し A〜E がこの順で各1回
-check('⑦ modal fade = 7', src.count('class="modal fade"') == 7, src.count('class="modal fade"'))
+check('⑦ modal fade = 8(v2.2 で棚卸モーダル +1)', src.count('class="modal fade"') == 8, src.count('class="modal fade"'))
 heads = ['A. 修理に出す前に試す', 'B. 修理フロー', 'C. 復帰チェック', 'D. リンク集', 'E. 発送の鉄則']
 pos = [guide_js.find(h) for h in heads]
 check('⑧ 見出し A〜E がこの順で各1回', all(p >= 0 for p in pos) and pos == sorted(pos) and all(guide_js.count(h) == 1 for h in heads), str(pos))
